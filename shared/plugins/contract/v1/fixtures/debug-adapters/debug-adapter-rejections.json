@@ -208,6 +208,102 @@
       "expected": {"code": "debug.target.invalid", "field": "target.path"}
     },
     {
+      "id": "adapter-arguments-empty",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments"}
+    },
+    {
+      "id": "adapter-arguments-too-many",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"a0": "target.path", "a1": "target.path", "a2": "target.path", "a3": "target.path", "a4": "target.path", "a5": "target.path", "a6": "target.path", "a7": "target.path", "a8": "target.path"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments"}
+    },
+    {
+      "id": "adapter-argument-path-too-deep",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"a.b.c.d.e": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments"}
+    },
+    {
+      "id": "adapter-argument-with-a-binding-of-its-own",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"cwd": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.cwd"}
+    },
+    {
+      "id": "adapter-argument-replaces-the-environment",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"env": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.env"}
+    },
+    {
+      "id": "adapter-argument-inside-a-fixed-binding",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"program.dir": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.program.dir"}
+    },
+    {
+      "id": "adapter-argument-two-levels-inside-the-environment",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"env.PWD.dir": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.env.PWD.dir"}
+    },
+    {
+      "id": "adapter-arguments-overlap-each-other",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"dlv": "target.path", "dlv.cwd": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.dlv.cwd"}
+    },
+    {
+      "id": "adapter-argument-under-a-default-that-is-no-object",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"env.PWD": "target.directory"}}, "arguments": {"env": "PWD"}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.env.PWD"}
+    },
+    {
+      "id": "adapter-argument-no-debug",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"noDebug": "target.path"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.noDebug"}
+    },
+    {
+      "id": "adapter-argument-host-prefix",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"__sessionId": "target.path"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.__sessionId"}
+    },
+    {
+      "id": "adapter-argument-from-a-non-path-fact",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"dlvCwd": "target.processID"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.dlvCwd"}
+    },
+    {
+      "id": "adapter-argument-set-by-the-defaults",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"dlvCwd": "target.directory"}}, "arguments": {"dlvCwd": "/work"}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.dlvCwd"}
+    },
+    {
+      "id": "adapter-argument-overlaps-the-connection",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/requests", "value": ["attach"]}, {"op": "set", "path": "/context/manifestMetadata/permissions", "value": ["debug.attach", "debug.launch"]}, {"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"attach": {"targetBindings": {"adapterArguments": {"connect": "target.workingDirectory"}, "connection": {"host": "connect.host", "port": "connect.port"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.attach.targetBindings.connection.host"}
+    },
+    {
+      "id": "adapter-argument-without-its-path",
+      "layer": "corePlan",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"dlvCwd": "target.directory"}}}}}, {"op": "set", "path": "/context/target/path", "value": "main.go"}],
+      "expected": {"code": "debug.target.invalid", "field": "target.path"}
+    },
+    {
+      "id": "adapter-argument-without-a-working-directory",
+      "layer": "corePlan",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"root": "target.workingDirectory"}}}}}],
+      "expected": {"code": "debug.target.invalid", "field": "target.workingDirectory"}
+    },
+    {
       "id": "executable-without-binding",
       "layer": "coreManifest",
       "edits": [{"op": "set", "path": "/block/settings", "value": [{"id": "program", "type": "file", "title": "Program", "default": "", "scope": "project", "effect": "nextRun"}]}, {"op": "set", "path": "/context/manifestMetadata/requires/settings", "value": 0}, {"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"executable": {"setting": "program", "candidates": ["${workspaceFolder}/build/app"]}}}}],

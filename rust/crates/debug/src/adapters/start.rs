@@ -179,6 +179,13 @@ fn bound_arguments(
         &bindings.env,
         target.environment.as_ref().map(|env| json!(env)),
     );
+    // After `env`, so a path inside it adds a variable to the bound
+    // environment instead of replacing it.
+    for (path, fact) in bindings.adapter_arguments.iter().flatten() {
+        if let Some(value) = path_fact(target, fact) {
+            fill_argument(&mut arguments, path, Value::from(value))?;
+        }
+    }
     let connection = match &bindings.connection {
         Some(binding) => Some(bind_connection(binding, target, &mut arguments)?),
         None => None,
@@ -196,6 +203,18 @@ pub(crate) fn target_directory(path: &str) -> Option<&str> {
         .parent()
         .and_then(std::path::Path::to_str)
         .filter(|directory| !directory.is_empty())
+}
+
+/// The value of a path fact an `adapterArguments` binding reads, or `None`
+/// when the target does not carry it.
+pub(crate) fn path_fact<'a>(target: &'a TargetFacts, fact: &str) -> Option<&'a str> {
+    let present = |value: &'a Option<String>| value.as_deref().filter(|value| !value.is_empty());
+    match fact {
+        "target.path" => present(&target.path),
+        TARGET_DIRECTORY => present(&target.path).and_then(target_directory),
+        "target.workingDirectory" => present(&target.working_directory),
+        _ => None,
+    }
 }
 
 /// Writes the target's endpoint, and its path mappings when the adapter takes
@@ -285,34 +304,53 @@ fn bind_connection(
 /// `DebugConnectionBinding::validate`), so an occupied path is a bug in the
 /// declaration that slipped past it and is refused rather than overwritten.
 fn set_argument(arguments: &mut Map<String, Value>, path: &str, value: Value) -> Validation<()> {
-    let occupied = || {
-        PluginRejection::at(
-            "debug.arguments.invalid",
-            path,
-            "The adapter's arguments already hold something at this path.",
-        )
-    };
-    let mut current = arguments;
-    let mut names = path.split('.').peekable();
-    while let Some(name) = names.next() {
-        if names.peek().is_none() {
-            return match current.entry(name.to_string()) {
-                serde_json::map::Entry::Vacant(slot) => {
-                    slot.insert(value);
-                    Ok(())
-                }
-                serde_json::map::Entry::Occupied(_) => Err(occupied()),
-            };
+    let (parent, name) = argument_parent(arguments, path)?;
+    match parent.entry(name) {
+        serde_json::map::Entry::Vacant(slot) => {
+            slot.insert(value);
+            Ok(())
         }
+        serde_json::map::Entry::Occupied(_) => Err(occupied_argument(path)),
+    }
+}
+
+/// Fills the argument at a dotted path unless something is already there,
+/// creating the objects on the way, the way every target binding fills only
+/// what the defaults and earlier bindings leave out.
+fn fill_argument(arguments: &mut Map<String, Value>, path: &str, value: Value) -> Validation<()> {
+    let (parent, name) = argument_parent(arguments, path)?;
+    parent.entry(name).or_insert(value);
+    Ok(())
+}
+
+/// The object that holds the last name of a dotted path, with that name,
+/// creating the objects on the way. Validation keeps every value on the way an
+/// object, so one that is not is refused rather than replaced.
+fn argument_parent<'a, 'p>(
+    arguments: &'a mut Map<String, Value>,
+    path: &'p str,
+) -> Validation<(&'a mut Map<String, Value>, &'p str)> {
+    let (parents, name) = path.rsplit_once('.').unwrap_or(("", path));
+    let mut current = arguments;
+    for parent in parents.split('.').filter(|parent| !parent.is_empty()) {
         let next = current
-            .entry(name.to_string())
+            .entry(parent.to_string())
             .or_insert_with(|| Value::Object(Map::new()));
         let Value::Object(next) = next else {
-            return Err(occupied());
+            return Err(occupied_argument(path));
         };
         current = next;
     }
-    Ok(())
+    Ok((current, name))
+}
+
+/// The rejection of a path whose way or end the arguments already hold.
+fn occupied_argument(path: &str) -> PluginRejection {
+    PluginRejection::at(
+        "debug.arguments.invalid",
+        path,
+        "The adapter's arguments already hold something at this path.",
+    )
 }
 
 /// The endpoint a connection target names, checked.
