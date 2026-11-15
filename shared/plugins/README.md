@@ -199,7 +199,7 @@ fixture 放在 `fixtures/<功能>/` 下，文件按演示的能力命名，例�
 | `node --test shared/plugins/sdk/node/test/*.test.mjs` | Node.js SDK 的单元测试 |
 | `npm run --prefix shared/plugins/sdk/node test:types` | Node.js SDK 的 TypeScript 使用方检查；先运行 `npm ci --prefix shared/plugins/sdk/node --ignore-scripts` 安装开发依赖 |
 | `mvn -B -ntp -f shared/plugins/sdk/java/pom.xml verify` | Java SDK 的单元测试；加 `-Djvm=<java>` 可指定运行测试的 Java（CI 用 Java 8） |
-| `cargo test --locked --manifest-path shared/plugins/sdk/rust/Cargo.toml` | Rust SDK 的单元测试（CI 用 Rust 1.87，另用 stable 跑 `cargo fmt` 和 `cargo clippy`） |
+| `cargo test --locked --manifest-path shared/plugins/sdk/rust/Cargo.toml` | Rust SDK 的单元测试（CI 用 Rust 1.87，另用仓库 `rust-toolchain.toml` 固定的版本跑 `cargo fmt` 和 `cargo clippy`） |
 | `node shared/plugins/scripts/sdk-e2e.mjs` | 端到端测试：先构建三个 SDK 的示例后端，再运行 `cargo test -p lithe-core --features plugin-sdk-e2e` 的 `plugin_sdk_node`、`plugin_sdk_java`、`plugin_sdk_rust` 和 `plugin_sdk_build` 四个测试，对象是**当前工作树的 Core**；总是包含原生构建工作流和快捷键导入场景 |
 
 端到端测试需要 Rust、Node.js 20.3+、Java（`LITHE_PLUGIN_SDK_JAVA_RUNTIME` 指定，或 `PATH` 上的 `java`）和 Maven。场景文件在 [`sdk/e2e/`](sdk/e2e)：Node.js 和 Java 跑同一套构建后端场景，Rust 跑插件后端场景（`plugin_sdk/backend.rs`），测试代替宿主应答凭据请求。`LITHE_PLUGIN_SDK_JAVA_SAMPLE`、`LITHE_PLUGIN_SDK_JAVA_NATIVE_SAMPLE` 和 `LITHE_PLUGIN_SDK_RUST_SAMPLE` 可以指定已构建好的示例，跳过构建。
@@ -409,7 +409,7 @@ When a change touches the contract, a capability version, or the plugin function
 | `node --test shared/plugins/sdk/node/test/*.test.mjs` | Node.js SDK unit tests |
 | `npm run --prefix shared/plugins/sdk/node test:types` | Node.js SDK TypeScript consumer check; first run `npm ci --prefix shared/plugins/sdk/node --ignore-scripts` to install the development dependencies |
 | `mvn -B -ntp -f shared/plugins/sdk/java/pom.xml verify` | Java SDK unit tests; add `-Djvm=<java>` to choose the Java that runs them (CI uses Java 8) |
-| `cargo test --locked --manifest-path shared/plugins/sdk/rust/Cargo.toml` | Rust SDK unit tests (CI uses Rust 1.87, plus stable for `cargo fmt` and `cargo clippy`) |
+| `cargo test --locked --manifest-path shared/plugins/sdk/rust/Cargo.toml` | Rust SDK unit tests (CI uses Rust 1.87, plus the release `rust-toolchain.toml` pins for `cargo fmt` and `cargo clippy`) |
 | `node shared/plugins/scripts/sdk-e2e.mjs` | End-to-end tests: builds the sample backends of the three SDKs, then runs the four tests `plugin_sdk_node`, `plugin_sdk_java`, `plugin_sdk_rust`, and `plugin_sdk_build` of `cargo test -p lithe-core --features plugin-sdk-e2e` against the **Core in the current working tree**; it always includes the native build workflow and shortcut import scenarios |
 
 The end-to-end tests need Rust, Node.js 20.3+, Java (set `LITHE_PLUGIN_SDK_JAVA_RUNTIME`, or have `java` on `PATH`), and Maven. The scenario files are in [`sdk/e2e/`](sdk/e2e): Node.js and Java run the same build backend scenarios, Rust runs the plugin backend scenario (`plugin_sdk/backend.rs`), and the test answers credential requests in place of the host. `LITHE_PLUGIN_SDK_JAVA_SAMPLE`, `LITHE_PLUGIN_SDK_JAVA_NATIVE_SAMPLE`, and `LITHE_PLUGIN_SDK_RUST_SAMPLE` can point at already built samples to skip building them.

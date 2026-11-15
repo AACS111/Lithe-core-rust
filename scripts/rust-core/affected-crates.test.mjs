@@ -77,6 +77,7 @@ test('workspace files, contract fixtures and the checks select every crate', () 
     'shared/plugins/contract/v1/README.md',
     'scripts/rust-core/verify-rust-core-comments.sh',
     '.github/workflows/rust-core.yml',
+    'rust-toolchain.toml',
   ]) {
     assert.equal(selectCrates(crates, [file]).size, crates.length, file);
   }

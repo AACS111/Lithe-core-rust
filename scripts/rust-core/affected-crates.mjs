@@ -33,7 +33,8 @@ export const HOSTS = {
 /**
  * Paths outside crate directories that can change the build or tests of any
  * crate. `rust/` holds the workspace manifest, the lock file, and the
- * fixtures, contracts and log catalog that several crates read.
+ * fixtures, contracts and log catalog that several crates read;
+ * `rust-toolchain.toml` pins the compiler every crate is built with.
  */
 export const EVERY_CRATE = [
   'rust/',
@@ -41,6 +42,7 @@ export const EVERY_CRATE = [
   'scripts/rust-core/',
   'scripts/logging/',
   '.github/workflows/rust-core.yml',
+  'rust-toolchain.toml',
 ];
 
 /** Paths outside crate directories that only one crate builds. */
