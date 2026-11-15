@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Test the CI scripts
         run: node --test scripts/rust-core/*.test.mjs
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: clippy, rustfmt
           targets: x86_64-pc-windows-msvc
@@ -139,7 +139,7 @@ jobs:
       TEST_ARGS: ${{ matrix.test-args }}
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Test
         run: |

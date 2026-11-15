@@ -1,6 +1,6 @@
 # 参与 Rust Core 开发
 
-本页规定平台相关代码怎么写、平台测试放在哪里，以及 CI 怎样只运行受影响的 crate。插件契约和 SDK 的规则见 [`shared/plugins/README.md`](shared/plugins/README.md)。
+本页规定平台相关代码怎么写、平台测试放在哪里、CI 怎样只运行受影响的 crate，以及固定的 Rust 版本怎么升级。插件契约和 SDK 的规则见 [`shared/plugins/README.md`](shared/plugins/README.md)。
 
 ## 平台差异写成数据
 
@@ -35,7 +35,7 @@ test-features = ["server"]     # 测试需要的 feature，在每台主机上都
 [`.github/workflows/rust-core.yml`](.github/workflows/rust-core.yml) 由四个作业组成：
 
 - **Select crates**：先运行 CI 脚本的测试和上面的放置检查，再由 [`affected-crates.mjs`](scripts/rust-core/affected-crates.mjs) 根据 PR 改动的文件选出 crate。选中的是文件所在的 crate，加上所有直接或间接依赖它的 crate（各种依赖都算，包括 dev-dependency）。另外几类文件的处理是：
-  - 会选中全部 crate：`rust/` 下不属于某个 crate 的文件（workspace 清单、`Cargo.lock`、`fixtures/`、`contracts/`、`logging/`）、`shared/plugins/contract/`、`scripts/rust-core/`、`scripts/logging/`，以及工作流文件本身。
+  - 会选中全部 crate：`rust/` 下不属于某个 crate 的文件（workspace 清单、`Cargo.lock`、`fixtures/`、`contracts/`、`logging/`）、`shared/plugins/contract/`、`scripts/rust-core/`、`scripts/logging/`、`rust-toolchain.toml`，以及工作流文件本身。
   - `shared/plugins/sdk/e2e/` 只选中 `lithe-core`。
   - 文档、SDK 等其他文件不选中任何 crate。
 - **Linux**：对选中的 crate 依次运行格式检查（全部 crate，耗时很短）、日志事件目录检查、注释规范（文本检查覆盖全部 crate，Rustdoc 只构建选中的 crate）、启用全部 feature 的 clippy、针对 `x86_64-pc-windows-msvc` 的 clippy（只用默认 feature），最后是启用 `test-features` 的测试。
@@ -43,6 +43,16 @@ test-features = ["server"]     # 测试需要的 feature，在每台主机上都
 - **Rust Core gate**：汇总上面三个作业。作业被跳过算通过，其余结果都算失败。工作流不设路径过滤，所以每个 PR 都会报告这个检查，分支规则可以把它设为必过。
 
 手动运行工作流（workflow_dispatch）会检查全部 crate。CI 只缓存下载的依赖，不缓存构建产物。
+
+## 工具链
+
+仓库根目录的 [`rust-toolchain.toml`](rust-toolchain.toml) 固定 Rust 版本，本地和 CI 用同一个版本，新版本 clippy 新增的 lint 只会在主动升级时出现，不会让无关的 PR 失败。
+
+- 在仓库里运行 `cargo` 时，rustup 自动安装并使用这个版本，不需要切换默认工具链。Homebrew 等不经过 rustup 安装的 Rust 不读这个文件，请改用 rustup。
+- 额外的编译目标装在固定版本上：在仓库目录里运行 `rustup target add x86_64-pc-windows-msvc`，再运行下面的 Windows clippy。
+- 升级时在同一个 PR 里修改 `rust-toolchain.toml` 的 `channel` 和 `.github/workflows` 里所有 `dtolnay/rust-toolchain@<版本>`（`@1.87` 除外），并修复新版本报出的问题。两处必须写同一个版本字符串，例如都写 `1.100.0`：rustup 把 `1.100` 和 `1.100.0` 当成两个工具链，写得不一致时 CI 会另装一份没有 clippy、rustfmt 和 Windows 目标的工具链。
+- Lithe-IDEA 构建 Core 时使用 Lithe-IDEA 仓库根目录自己的 `rust-toolchain.toml`，Core 升级合入后，Lithe-IDEA 要同步升级到同一版本。
+- Rust 插件 SDK（`shared/plugins/sdk/rust`）的最低版本 `rust-version = "1.87"` 不随固定版本变化，CI 用 `cargo +1.87` 测试它。
 
 ## 本地命令
 
@@ -59,7 +69,7 @@ cargo test --manifest-path rust/Cargo.toml -p lithe-platform -p lithe-platform-t
 
 # Contributing to Rust Core (English)
 
-This page sets how platform code is written, where platform tests go, and how CI runs only the crates a change affects. The plugin contract and SDK rules live in [`shared/plugins/README.md`](shared/plugins/README.md).
+This page sets how platform code is written, where platform tests go, how CI runs only the crates a change affects, and how the pinned Rust release is upgraded. The plugin contract and SDK rules live in [`shared/plugins/README.md`](shared/plugins/README.md).
 
 ## Platform differences are data
 
@@ -94,7 +104,7 @@ test-features = ["server"]     # features the tests need, enabled on every host
 [`.github/workflows/rust-core.yml`](.github/workflows/rust-core.yml) has four jobs:
 
 - **Select crates** tests the CI scripts, runs the placement check above, and lets [`affected-crates.mjs`](scripts/rust-core/affected-crates.mjs) choose crates from the files the pull request changes: the crate each file belongs to, plus every crate that depends on it directly or indirectly, through any kind of dependency, dev-dependencies included. Other files are handled as follows:
-  - These select every crate: files under `rust/` outside any crate (the workspace manifest, `Cargo.lock`, `fixtures/`, `contracts/`, `logging/`), `shared/plugins/contract/`, `scripts/rust-core/`, `scripts/logging/` and the workflow itself.
+  - These select every crate: files under `rust/` outside any crate (the workspace manifest, `Cargo.lock`, `fixtures/`, `contracts/`, `logging/`), `shared/plugins/contract/`, `scripts/rust-core/`, `scripts/logging/`, `rust-toolchain.toml` and the workflow itself.
   - `shared/plugins/sdk/e2e/` selects `lithe-core` only.
   - Documentation, the SDKs and other files select no crate.
 - **Linux** runs, for the selected crates: the formatting check (every crate; it is quick), the log event catalog check, the comment rules (the textual checks cover every crate, Rustdoc builds the selected ones), clippy with every feature, clippy for `x86_64-pc-windows-msvc` with default features, and the tests with their `test-features`.
@@ -102,6 +112,16 @@ test-features = ["server"]     # features the tests need, enabled on every host
 - **Rust Core gate** sums up the three jobs above. A skipped job passes; any other result fails. The workflow has no path filter, so every pull request reports this check and branch rules can require it.
 
 A manual run (workflow_dispatch) checks every crate. CI caches downloaded dependencies only, not build output.
+
+## Toolchain
+
+[`rust-toolchain.toml`](rust-toolchain.toml) at the repository root pins the Rust release. Local builds and CI use the same release, so lints added by a new clippy show up only when the pin is upgraded, never in an unrelated pull request.
+
+- When `cargo` runs in this repository, rustup installs and uses that release; there is no need to change the default toolchain. Rust installed without rustup, for example by Homebrew, ignores the file; use rustup instead.
+- Extra targets are added to the pinned release: run `rustup target add x86_64-pc-windows-msvc` in the repository before the Windows clippy below.
+- An upgrade changes, in one pull request, the `channel` in `rust-toolchain.toml` and every `dtolnay/rust-toolchain@<version>` in `.github/workflows` except `@1.87`, and fixes what the new release reports. Both places must spell the version the same way, for example `1.100.0` in each: rustup treats `1.100` and `1.100.0` as two toolchains, and a mismatch makes CI install a second one without clippy, rustfmt or the Windows target.
+- Lithe-IDEA builds Core with the `rust-toolchain.toml` at its own repository root. Once a Core upgrade is merged, Lithe-IDEA moves to the same release.
+- The Rust plugin SDK (`shared/plugins/sdk/rust`) keeps its minimum `rust-version = "1.87"` whatever the pin is; CI tests it with `cargo +1.87`.
 
 ## Local commands
 

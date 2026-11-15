@@ -389,7 +389,7 @@ pub(crate) fn semantic_token_result(
     }
     let mut tokens = Vec::with_capacity(data.len() / 5);
     let (mut line, mut column) = (0_u64, 0_u64);
-    for chunk in data.chunks_exact(5) {
+    for chunk in data.as_chunks::<5>().0 {
         let numbers: Vec<u64> = chunk.iter().map(Value::as_u64).collect::<Option<_>>()?;
         if numbers.iter().any(|value| *value > u32::MAX as u64) {
             return None;
