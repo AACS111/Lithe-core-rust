@@ -55,9 +55,14 @@ const PERMISSION_DEBUG_ATTACH: &str = "debug.attach";
 /// (`lithe/host/debug/start`), a host-method permission of the backend.
 const PERMISSION_DEBUG_START: &str = "debug.start";
 
+/// Installing, after the user confirms each time, a command the plugin's
+/// launches need with one of its required tools.
+const PERMISSION_COMMAND_INSTALL: &str = "commands.install";
+
 const KNOWN_PERMISSIONS: &[&str] = &[
     PERMISSION_BACKEND,
     PERMISSION_BUILD,
+    PERMISSION_COMMAND_INSTALL,
     PERMISSION_CREDENTIALS,
     PERMISSION_DEBUG_ATTACH,
     PERMISSION_DEBUG_LAUNCH,
@@ -160,6 +165,18 @@ impl DeclarativePluginManifest {
         }
         if !self.project_generators.is_empty() {
             required.insert(PERMISSION_PROJECT_GENERATE);
+        }
+        if !self.command_installers.is_empty() {
+            required.insert(PERMISSION_COMMAND_INSTALL);
+        } else if self
+            .permissions
+            .iter()
+            .any(|p| p == PERMISSION_COMMAND_INSTALL)
+        {
+            return Err(invalid(
+                "permissions",
+                "commands.install is used by a command installer; declare one or remove the permission.",
+            ));
         }
         if self.backend.is_some() {
             required.insert(PERMISSION_BACKEND);

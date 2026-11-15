@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 0,
+  "id": "dev.lithe.fixture.command-installer",
+  "displayName": "Command Installer Fixture",
+  "version": "0.1.0",
+  "pluginAPIVersion": 0,
+  "requires": {
+    "commandInstallers": 0,
+    "debugAdapters": 0,
+    "languageServers": 0,
+    "languages": 0
+  },
+  "requiresTools": ["builder"],
+  "vendor": {
+    "id": "org.example",
+    "displayName": "Example",
+    "signatureRequirement": "publisherPackage"
+  },
+  "permissions": [
+    "commands.install",
+    "debug.launch",
+    "languageServer.launch"
+  ],
+  "activationEvents": [
+    "onDebug:sample",
+    "onLanguage:sample"
+  ],
+  "languages": [
+    {
+      "id": "sample",
+      "displayName": "Sample",
+      "fileExtensions": ["sample"]
+    }
+  ],
+  "languageServers": [
+    {
+      "languageID": "sample",
+      "launch": { "kind": "systemCommand", "commands": ["sample-ls"] },
+      "arguments": ["serve"],
+      "validationArguments": ["version"]
+    }
+  ],
+  "debugAdapters": [
+    {
+      "id": "sample",
+      "displayName": "Sample Debugger",
+      "adapterID": "sample-dap",
+      "requests": ["launch"],
+      "selectors": [{ "targetKinds": ["file"], "languageIDs": ["sample"] }],
+      "configurationTypes": ["sample"],
+      "configurations": {
+        "launch": {
+          "targetBindings": { "program": "target.path", "cwd": "target.workingDirectory" }
+        }
+      },
+      "launch": {
+        "process": {
+          "launch": { "kind": "systemCommand", "commands": ["sample-dap"] },
+          "arguments": ["--stdio"]
+        },
+        "transport": "stdio"
+      }
+    }
+  ],
+  "commandInstallers": [
+    {
+      "id": "sample-ls",
+      "commands": ["sample-ls"],
+      "tool": "builder",
+      "minimumVersion": "1.2",
+      "arguments": ["install", "example.org/sample-ls@latest"],
+      "mayUseNetwork": true,
+      "timeoutSeconds": 300,
+      "targets": {
+        "managed": {
+          "environment": { "BUILDER_BIN": "${installDirectory}" }
+        },
+        "toolDefault": {
+          "directory": [
+            { "arguments": ["env", "BUILDER_BIN"] },
+            { "arguments": ["env", "BUILDER_HOME"], "pathList": true, "append": "bin" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sample-dap",
+      "commands": ["sample-dap"],
+      "tool": "builder",
+      "arguments": ["install", "example.org/sample-dap@latest"],
+      "mayUseNetwork": true,
+      "targets": {
+        "managed": {
+          "arguments": ["install", "--prefix", "${installDirectory}", "example.org/sample-dap@latest"],
+          "commandDirectory": "bin"
+        }
+      }
+    }
+  ]
+}

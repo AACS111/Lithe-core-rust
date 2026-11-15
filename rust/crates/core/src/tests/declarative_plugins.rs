@@ -1,6 +1,8 @@
 use lithe_plugin_manifest::{
-    discover_tests_command, language_server_launch_plan_command, resolve_settings_command,
-    run_plan_command, test_plan_command, validate_command, workspace_configuration_command,
+    command_installer_default_directory_command, command_installer_plan_command,
+    command_installer_requirements_command, discover_tests_command,
+    language_server_launch_plan_command, resolve_settings_command, run_plan_command,
+    test_plan_command, validate_command, workspace_configuration_command,
 };
 use serde_json::{json, Value};
 
@@ -63,6 +65,10 @@ const PROJECT_GENERATOR_FIXTURE: &str =
     contract_file!("fixtures/project-generators/project-generator.plugin.json");
 const PROJECT_GENERATOR_TOOL_FIXTURE: &str =
     contract_file!("fixtures/project-generators/project-generator-tool-field.plugin.json");
+const COMMAND_INSTALLER_FIXTURE: &str =
+    contract_file!("fixtures/command-installers/command-installer.plugin.json");
+const COMMAND_INSTALLER_PLANS: &str =
+    contract_file!("fixtures/command-installers/command-installer-plans.json");
 const INVALID_MANIFESTS: &str = contract_file!("fixtures/manifest/invalid-manifests.json");
 const COMMAND_PLANS: &str = contract_file!("fixtures/languages/command-plans.json");
 
@@ -95,6 +101,7 @@ fn fixture(name: &str) -> Value {
         "editor-providers.plugin.json" => EDITOR_PROVIDERS_FIXTURE,
         "project-generator.plugin.json" => PROJECT_GENERATOR_FIXTURE,
         "project-generator-tool-field.plugin.json" => PROJECT_GENERATOR_TOOL_FIXTURE,
+        "command-installer.plugin.json" => COMMAND_INSTALLER_FIXTURE,
         other => panic!("unknown fixture {other}"),
     };
     serde_json::from_str(source).expect("fixture manifest is JSON")
@@ -126,6 +133,7 @@ fn contract_fixtures_and_official_plugins_validate() {
         LANGUAGE_SERVER_BACKEND_FIXTURE,
         EDITOR_PROVIDERS_FIXTURE,
         PROJECT_GENERATOR_TOOL_FIXTURE,
+        COMMAND_INSTALLER_FIXTURE,
     ] {
         let outcome = validate(serde_json::from_str(source).unwrap());
         assert_eq!(outcome["status"], "ok", "{outcome}");
@@ -251,6 +259,93 @@ fn invalid_manifest_fixtures_report_their_stable_codes() {
             );
         }
     }
+}
+
+/// The command-installer commands answer the golden cases for this host's
+/// platform; `lithe-plugin-manifest` checks the same cases for every
+/// platform.
+#[test]
+fn command_installer_fixtures_match_on_this_host() {
+    let plans: Value = serde_json::from_str(COMMAND_INSTALLER_PLANS).unwrap();
+    let platform = if cfg!(windows) { "windows" } else { "unix" };
+    for case in plans["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let specific = &case["platforms"][platform];
+        let mut payload = json!({ "manifest": fixture("command-installer.plugin.json") });
+        for source in [&case["payload"], &specific["payload"]] {
+            for (field, value) in source.as_object().into_iter().flatten() {
+                payload[field] = value.clone();
+            }
+        }
+        for edit in case["manifestEdits"].as_array().into_iter().flatten() {
+            let pointer = edit["path"].as_str().unwrap();
+            *payload["manifest"].pointer_mut(pointer).unwrap() = edit["value"].clone();
+        }
+        let outcome = match case["operation"].as_str().unwrap() {
+            "requirements" => command_installer_requirements_command(payload),
+            "plan" => command_installer_plan_command(payload),
+            "defaultDirectory" => command_installer_default_directory_command(payload),
+            other => panic!("unknown operation {other}"),
+        }
+        .expect("payload is well formed");
+        let expected = if specific.get("expected").is_some() {
+            &specific["expected"]
+        } else {
+            &case["expected"]
+        };
+        if expected["status"] == "rejected" {
+            assert_eq!(outcome["status"], "rejected", "{name}: {outcome}");
+            assert_eq!(
+                outcome["error"]["code"], expected["code"],
+                "{name}: {outcome}"
+            );
+            assert_eq!(
+                outcome["error"]["field"], expected["field"],
+                "{name}: {outcome}"
+            );
+        } else {
+            assert_eq!(&outcome, expected, "{name}");
+        }
+    }
+}
+
+/// The install review shows everything an installer runs, so changing its
+/// arguments or targets is a new program the user approves again.
+#[test]
+fn command_installers_are_reviewed_programs() {
+    let programs = |manifest: Value| {
+        let outcome = lithe_plugin_marketplace::install_review_command(json!({
+            "manifest": manifest,
+        }))
+        .expect("payload is well formed");
+        outcome["review"]["programs"].as_array().unwrap().clone()
+    };
+    let manifest = fixture("command-installer.plugin.json");
+    let before = programs(manifest.clone());
+    let installers: Vec<&Value> = before
+        .iter()
+        .filter(|program| program["kind"] == "commandInstaller")
+        .collect();
+    assert_eq!(installers.len(), 2);
+    assert_eq!(installers[0]["installer"], "sample-dap");
+    assert_eq!(installers[1]["timeoutSeconds"], 300);
+    let mut changed = manifest;
+    changed["commandInstallers"][0]["arguments"] = json!(["install", "example.org/other@latest"]);
+    assert_ne!(programs(changed), before);
+}
+
+/// A malformed request is a Core failure, not a rejection.
+#[test]
+fn command_installer_requests_decode_strictly() {
+    let manifest = fixture("command-installer.plugin.json");
+    assert!(command_installer_plan_command(
+        json!({ "manifest": manifest, "installerID": "sample-ls", "target": "elsewhere" })
+    )
+    .is_err());
+    assert!(command_installer_default_directory_command(
+        json!({ "manifest": manifest, "installerID": "sample-ls" })
+    )
+    .is_err());
 }
 
 #[test]

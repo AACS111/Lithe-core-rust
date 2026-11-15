@@ -63,6 +63,21 @@ pub(super) fn dispatch(
             payload,
             lithe_plugin_language_servers::state_retention_command,
         ),
+        PluginsCommand::CommandInstallersRequirements => plugin_response(
+            id,
+            payload,
+            lithe_plugin_manifest::command_installer_requirements_command,
+        ),
+        PluginsCommand::CommandInstallersPlan => plugin_response(
+            id,
+            payload,
+            lithe_plugin_manifest::command_installer_plan_command,
+        ),
+        PluginsCommand::CommandInstallersDefaultDirectory => plugin_response(
+            id,
+            payload,
+            lithe_plugin_manifest::command_installer_default_directory_command,
+        ),
         PluginsCommand::ContentProvidersDecode => plugin_response(
             id,
             payload,

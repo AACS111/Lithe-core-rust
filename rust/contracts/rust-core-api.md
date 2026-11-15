@@ -447,6 +447,9 @@ or removing a command fails until the table changes in the same commit.
 | `plugins.declarative.languageServerLaunchPlan` | Expand a declarative plugin's language-server, build-provider, VCS-provider, backend, or debug-adapter launch with host directories and architecture |
 | `plugins.languageServers.decodeLaunch` | Bound the answer of a plugin backend that resolved a language server's launch and return the plan the host starts |
 | `plugins.languageServers.stateRetention` | Choose which inactive per-workspace state directories of a plugin language server the host deletes |
+| `plugins.commandInstallers.requirements` | List each `systemCommand` launch of a plugin with its commands and the installer that provides each |
+| `plugins.commandInstallers.plan` | Expand one command installer for the target the user chose |
+| `plugins.commandInstallers.defaultDirectory` | Read where a `toolDefault` installation puts its commands from the output of its directory probes |
 | `plugins.contentProviders.decode` | Bound the answer of a plugin content provider function and return the document text |
 | `debug.adapters.startArguments` | Check one debug start against a plugin's `debugAdapters[]` entry and return its DAP launch arguments |
 | `debug.validateAdapterEndpoint` | Validate an IDE-to-DAP TCP endpoint and classify whether remote consent is required; performs no DNS or network I/O |
@@ -4040,6 +4043,34 @@ those older than `maxAgeDays` and those beyond the newest that fit are listed.
 The host lists and deletes only directories under its own state storage, never
 inside an app bundle or installation directory.
 
+The `plugins.commandInstallers.*` commands implement
+[Command installers](../../shared/plugins/contract/v1/README.md#command-installers).
+They revalidate the manifest, read nothing and start nothing.
+`plugins.commandInstallers.requirements` accepts `{ manifest }` and returns
+`requirements: { consumers: [{ kind, id, commands: [{ command, installer }] }],
+installers: [{ id, commands, tool, minimumVersion, mayUseNetwork, targets }] }`.
+`kind` is `languageServer`, `buildProvider`, `vcsProvider`, `debugAdapter` or
+`backend`; `id` is the language, build system, VCS or adapter ID, `null` for
+the backend; `installer` is `null` for a command no installer provides.
+`plugins.commandInstallers.plan` accepts `{ manifest, installerID, target:
+"managed" | "toolDefault", installDirectory? }` and returns `plan: { installer,
+target, commands, tool, minimumVersion, mayUseNetwork, timeoutMilliseconds,
+arguments, environment, commandDirectory, directoryProbes: [{ arguments }] }`.
+A `managed` plan needs the absolute directory the host made and expands
+`${installDirectory}` in it; `commandDirectory` is that directory or the
+declared path below it, and `directoryProbes` is empty. A `toolDefault` plan
+takes no `installDirectory`, has a `null` `commandDirectory` and lists the
+probes. `plugins.commandInstallers.defaultDirectory` accepts `{ manifest,
+installerID, outputs }`, one standard output per probe in plan order (`null`
+for a probe that failed), and returns `directory`: the first probe output that
+names an absolute directory, its first path-list entry for a `pathList` probe,
+with `append` joined; `null` when none does. Paths follow the platform Core
+runs on. Refusals are `plugin.commandInstaller.unknown`,
+`plugin.commandInstaller.targetUndeclared`,
+`plugin.commandInstaller.directoryInvalid` and
+`plugin.commandInstaller.probeOutputsInvalid`; the golden cases are
+`shared/plugins/contract/v1/fixtures/command-installers/command-installer-plans.json`.
+
 `plugins.contentProviders.decode` accepts `{ result }`, the value a plugin
 function returned for a document of its content scheme, and returns
 `{ content }`. `result` is a string, or an object whose only member is
@@ -5995,6 +6026,7 @@ a code has one meaning across every contribution with that lifecycle:
 | `debugAdapter/start` | `debugAdapters[]` | process start |
 | `lithe/build/model` | `buildSystems[].model` command source | command run |
 | `lithe/build/dependencies` | `buildSystems[].dependencies` command source | command run |
+| `commandInstaller/install` | `commandInstallers[]` installation the user confirmed; `decode` when a provided command is missing after a successful exit | command run |
 
 | `stage` | Process start | Command run |
 | --- | --- | --- |

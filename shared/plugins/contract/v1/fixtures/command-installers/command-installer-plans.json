@@ -1,0 +1,299 @@
+{
+  "description": "Golden results of plugins.commandInstallers.requirements, plan and defaultDirectory for command-installer.plugin.json. payload is merged into {\"manifest\": <plugin>}; manifestEdits replace the value at a JSON pointer of the manifest. A case whose result depends on the host's path rules lists platforms.unix and platforms.windows, each with its own payload fields and expected outcome. A rejection is matched by its code and field only.",
+  "plugin": "command-installer.plugin.json",
+  "cases": [
+    {
+      "name": "requirements list every systemCommand launch and its installer",
+      "operation": "requirements",
+      "payload": {},
+      "expected": {
+        "status": "ok",
+        "requirements": {
+          "consumers": [
+            {
+              "kind": "debugAdapter",
+              "id": "sample",
+              "commands": [{ "command": "sample-dap", "installer": "sample-dap" }]
+            },
+            {
+              "kind": "languageServer",
+              "id": "sample",
+              "commands": [{ "command": "sample-ls", "installer": "sample-ls" }]
+            }
+          ],
+          "installers": [
+            {
+              "id": "sample-dap",
+              "commands": ["sample-dap"],
+              "tool": "builder",
+              "minimumVersion": null,
+              "mayUseNetwork": true,
+              "targets": ["managed"]
+            },
+            {
+              "id": "sample-ls",
+              "commands": ["sample-ls"],
+              "tool": "builder",
+              "minimumVersion": "1.2",
+              "mayUseNetwork": true,
+              "targets": ["managed", "toolDefault"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a command without an installer is listed with a null installer",
+      "operation": "requirements",
+      "payload": {},
+      "manifestEdits": [
+        { "path": "/debugAdapters/0/launch/process/launch/commands", "value": ["sample-dap", "other-dap"] }
+      ],
+      "expected": {
+        "status": "ok",
+        "requirements": {
+          "consumers": [
+            {
+              "kind": "debugAdapter",
+              "id": "sample",
+              "commands": [
+                { "command": "sample-dap", "installer": "sample-dap" },
+                { "command": "other-dap", "installer": null }
+              ]
+            },
+            {
+              "kind": "languageServer",
+              "id": "sample",
+              "commands": [{ "command": "sample-ls", "installer": "sample-ls" }]
+            }
+          ],
+          "installers": [
+            {
+              "id": "sample-dap",
+              "commands": ["sample-dap"],
+              "tool": "builder",
+              "minimumVersion": null,
+              "mayUseNetwork": true,
+              "targets": ["managed"]
+            },
+            {
+              "id": "sample-ls",
+              "commands": ["sample-ls"],
+              "tool": "builder",
+              "minimumVersion": "1.2",
+              "mayUseNetwork": true,
+              "targets": ["managed", "toolDefault"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "a managed plan passes the install directory through the environment",
+      "operation": "plan",
+      "payload": { "installerID": "sample-ls", "target": "managed" },
+      "platforms": {
+        "unix": {
+          "payload": { "installDirectory": "/data/lithe/commands/sample-ls" },
+          "expected": {
+            "status": "ok",
+            "plan": {
+              "installer": "sample-ls",
+              "target": "managed",
+              "commands": ["sample-ls"],
+              "tool": "builder",
+              "minimumVersion": "1.2",
+              "mayUseNetwork": true,
+              "timeoutMilliseconds": 300000,
+              "arguments": ["install", "example.org/sample-ls@latest"],
+              "environment": { "BUILDER_BIN": "/data/lithe/commands/sample-ls" },
+              "commandDirectory": "/data/lithe/commands/sample-ls",
+              "directoryProbes": []
+            }
+          }
+        },
+        "windows": {
+          "payload": { "installDirectory": "C:\\Lithe\\commands\\sample-ls" },
+          "expected": {
+            "status": "ok",
+            "plan": {
+              "installer": "sample-ls",
+              "target": "managed",
+              "commands": ["sample-ls"],
+              "tool": "builder",
+              "minimumVersion": "1.2",
+              "mayUseNetwork": true,
+              "timeoutMilliseconds": 300000,
+              "arguments": ["install", "example.org/sample-ls@latest"],
+              "environment": { "BUILDER_BIN": "C:\\Lithe\\commands\\sample-ls" },
+              "commandDirectory": "C:\\Lithe\\commands\\sample-ls",
+              "directoryProbes": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "a managed plan replaces the arguments and finds the commands below the directory",
+      "operation": "plan",
+      "payload": { "installerID": "sample-dap", "target": "managed" },
+      "platforms": {
+        "unix": {
+          "payload": { "installDirectory": "/data/lithe/commands/sample-dap" },
+          "expected": {
+            "status": "ok",
+            "plan": {
+              "installer": "sample-dap",
+              "target": "managed",
+              "commands": ["sample-dap"],
+              "tool": "builder",
+              "minimumVersion": null,
+              "mayUseNetwork": true,
+              "timeoutMilliseconds": 600000,
+              "arguments": ["install", "--prefix", "/data/lithe/commands/sample-dap", "example.org/sample-dap@latest"],
+              "environment": {},
+              "commandDirectory": "/data/lithe/commands/sample-dap/bin",
+              "directoryProbes": []
+            }
+          }
+        },
+        "windows": {
+          "payload": { "installDirectory": "C:\\Lithe\\commands\\sample-dap" },
+          "expected": {
+            "status": "ok",
+            "plan": {
+              "installer": "sample-dap",
+              "target": "managed",
+              "commands": ["sample-dap"],
+              "tool": "builder",
+              "minimumVersion": null,
+              "mayUseNetwork": true,
+              "timeoutMilliseconds": 600000,
+              "arguments": ["install", "--prefix", "C:\\Lithe\\commands\\sample-dap", "example.org/sample-dap@latest"],
+              "environment": {},
+              "commandDirectory": "C:\\Lithe\\commands\\sample-dap\\bin",
+              "directoryProbes": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "a toolDefault plan lists the directory probes",
+      "operation": "plan",
+      "payload": { "installerID": "sample-ls", "target": "toolDefault" },
+      "expected": {
+        "status": "ok",
+        "plan": {
+          "installer": "sample-ls",
+          "target": "toolDefault",
+          "commands": ["sample-ls"],
+          "tool": "builder",
+          "minimumVersion": "1.2",
+          "mayUseNetwork": true,
+          "timeoutMilliseconds": 300000,
+          "arguments": ["install", "example.org/sample-ls@latest"],
+          "environment": {},
+          "commandDirectory": null,
+          "directoryProbes": [
+            { "arguments": ["env", "BUILDER_BIN"] },
+            { "arguments": ["env", "BUILDER_HOME"] }
+          ]
+        }
+      }
+    },
+    {
+      "name": "an undeclared installer is refused",
+      "operation": "plan",
+      "payload": { "installerID": "missing", "target": "toolDefault" },
+      "expected": { "status": "rejected", "code": "plugin.commandInstaller.unknown", "field": "installerID" }
+    },
+    {
+      "name": "an undeclared target is refused",
+      "operation": "plan",
+      "payload": { "installerID": "sample-dap", "target": "toolDefault" },
+      "expected": { "status": "rejected", "code": "plugin.commandInstaller.targetUndeclared", "field": "target" }
+    },
+    {
+      "name": "a managed plan without an install directory is refused",
+      "operation": "plan",
+      "payload": { "installerID": "sample-ls", "target": "managed" },
+      "expected": { "status": "rejected", "code": "plugin.commandInstaller.directoryInvalid", "field": "installDirectory" }
+    },
+    {
+      "name": "a relative install directory is refused",
+      "operation": "plan",
+      "payload": { "installerID": "sample-ls", "target": "managed", "installDirectory": "commands/sample-ls" },
+      "expected": { "status": "rejected", "code": "plugin.commandInstaller.directoryInvalid", "field": "installDirectory" }
+    },
+    {
+      "name": "a path of the other platform is not an install directory",
+      "operation": "plan",
+      "payload": { "installerID": "sample-ls", "target": "managed" },
+      "platforms": {
+        "unix": {
+          "payload": { "installDirectory": "C:\\Lithe\\commands\\sample-ls" },
+          "expected": { "status": "rejected", "code": "plugin.commandInstaller.directoryInvalid", "field": "installDirectory" }
+        },
+        "windows": {
+          "payload": { "installDirectory": "/data/lithe/commands/sample-ls" },
+          "expected": { "status": "rejected", "code": "plugin.commandInstaller.directoryInvalid", "field": "installDirectory" }
+        }
+      }
+    },
+    {
+      "name": "a toolDefault plan takes no install directory",
+      "operation": "plan",
+      "payload": { "installerID": "sample-ls", "target": "toolDefault", "installDirectory": "/data/lithe/commands/sample-ls" },
+      "expected": { "status": "rejected", "code": "plugin.commandInstaller.directoryInvalid", "field": "installDirectory" }
+    },
+    {
+      "name": "the first probe that prints a directory decides",
+      "operation": "defaultDirectory",
+      "payload": { "installerID": "sample-ls" },
+      "platforms": {
+        "unix": {
+          "payload": { "outputs": ["/home/me/bin\n", "/home/me/go\n"] },
+          "expected": { "status": "ok", "directory": "/home/me/bin" }
+        },
+        "windows": {
+          "payload": { "outputs": ["C:\\Users\\me\\bin\r\n", "C:\\Users\\me\\go\r\n"] },
+          "expected": { "status": "ok", "directory": "C:\\Users\\me\\bin" }
+        }
+      }
+    },
+    {
+      "name": "an empty probe falls through to the first entry of a path list",
+      "operation": "defaultDirectory",
+      "payload": { "installerID": "sample-ls" },
+      "platforms": {
+        "unix": {
+          "payload": { "outputs": ["\n", "/home/me/go:/opt/go\n"] },
+          "expected": { "status": "ok", "directory": "/home/me/go/bin" }
+        },
+        "windows": {
+          "payload": { "outputs": ["\r\n", "C:\\Users\\me\\go;D:\\go\r\n"] },
+          "expected": { "status": "ok", "directory": "C:\\Users\\me\\go\\bin" }
+        }
+      }
+    },
+    {
+      "name": "no probe naming an absolute directory gives null",
+      "operation": "defaultDirectory",
+      "payload": { "installerID": "sample-ls", "outputs": [null, "go\n"] },
+      "expected": { "status": "ok", "directory": null }
+    },
+    {
+      "name": "one output is sent for each probe",
+      "operation": "defaultDirectory",
+      "payload": { "installerID": "sample-ls", "outputs": ["/home/me/bin\n"] },
+      "expected": { "status": "rejected", "code": "plugin.commandInstaller.probeOutputsInvalid", "field": "outputs" }
+    },
+    {
+      "name": "an installer without toolDefault has no default directory",
+      "operation": "defaultDirectory",
+      "payload": { "installerID": "sample-dap", "outputs": [] },
+      "expected": { "status": "rejected", "code": "plugin.commandInstaller.targetUndeclared", "field": "installerID" }
+    }
+  ]
+}

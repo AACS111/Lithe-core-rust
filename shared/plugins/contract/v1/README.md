@@ -178,6 +178,7 @@ symbolic links. A host treats an installed package as read-only.
 | `settings` | User-adjustable plugin options. |
 | `ui` | Host-rendered tool windows and commands. |
 | `buildSystems` | Project-level build tools. |
+| `commandInstallers` | How the host installs a bare command a `systemCommand` launch needs; requires `commandInstallers: 0` and `commands.install`; see [Command installers](#command-installers). |
 | `toolDefinitions` | Plugin-owned tool policy ([Core foundation](toolchains/README.md)); requires `toolDefinitions: 0`; a host may offer read-only discovery and resolve Build and run tools. |
 | `toolchainProviders` | Backend fact-provider declarations ([Core foundation](toolchains/README.md)); requires `toolchainProviders: 0`, `backend: 0` and `toolchains.provide`. |
 | `keymapImportProviders` | Independent shortcut import providers; requires `keymapImportProviders: 0`, `backend: 0` and `keymaps.provide`. A host provides access to explicitly selected sources. |
@@ -482,8 +483,10 @@ declarative plugin writes no logging code. Each start of a `languageServers[]` o
 `debugAdapters[]` entry is one `languageServer/start` or `debugAdapter/start`
 operation, from launch resolution until `initialize` succeeds. Each run of a
 `buildSystems[]` model or dependencies command source is one `lithe/build/model` or
-`lithe/build/dependencies` operation, using the SDK request names. A failure
-carries one `code`:
+`lithe/build/dependencies` operation, using the SDK request names. Each
+installation of a [command installer](#command-installers) the user confirmed is
+one `commandInstaller/install` operation, from planning the chosen target until
+every provided command is in its directory. A failure carries one `code`:
 
 | Code | Meaning |
 | --- | --- |
@@ -493,8 +496,8 @@ carries one `code`:
 | `host.initializeFailed` | A started server or adapter failed its `initialize` handshake |
 | `host.timedOut` | The attempt exceeded its deadline |
 | `host.exitedEarly` | A server or adapter exited before `initialize` succeeded |
-| `host.commandFailed` | A build command exited unsuccessfully |
-| `host.outputInvalid` | A build command's output is not a valid document |
+| `host.commandFailed` | A build command or an installation exited unsuccessfully |
+| `host.outputInvalid` | A build command's output is not a valid document, or an installation that exited successfully did not provide its commands |
 
 User cancellation and superseded attempts record nothing. Plugin output, paths,
 and error text never appear in these facts. The executing owner and the
@@ -789,6 +792,7 @@ belongs to one capability:
 | `debugAdapters` | [`debugAdapters[]`](#debug-adapters) | — | Starts the adapter and applies its [declared features and defaults](#adapter-features-and-defaults). |
 | `outputLinkMatchers` | [`outputLinkMatchers[]`](#output-link-matchers) | — | Turns Run and Test console text into links through the declared patterns. |
 | `projectGenerators` | [`projectGenerators[]`](#project-generators), including [`tool` fields](#tool-fields) | — | Lists the entries in the New Project window and generates the project. |
+| `commandInstallers` | [`commandInstallers[]`](#command-installers) | — | Reports missing commands of `systemCommand` launches and installs them after the user confirms the command line, the network use and the target. |
 | `backend` | [`backend`](#plugin-backend): the plugin's own long-lived process | `litheFunctions` | Starts the backend with or without a page, serves the host services its permissions grant, and speaks `litheFunctions`. |
 | `toolDefinitions` | `toolDefinitions[]`: [tool identities, layouts, discovery and four-layer candidates](toolchains/README.md) | — | Resolves the definitions through the four layers. |
 | `toolchainProviders` | `toolchainProviders[]`: [provider declarations and permission-bound answer validation](toolchains/README.md) | toolchain provider protocol (`litheToolchains`) | Starts the provider and validates its answers. |
@@ -1140,6 +1144,101 @@ A toolchain that resolves to a project file remains project code,
 including through a symlink, and native configuration requires explicit Read
 before running it. See [`build-toolchains.plugin.json`](fixtures/build-systems/build-toolchains.plugin.json).
 
+## Command installers
+
+A [`systemCommand` launch](#process-start) names a bare command that the host
+finds with its tool discovery. When the machine lacks it, `commandInstallers[]`
+tells the host how to install it with a tool the plugin already requires, so
+the user installs it from plugin management instead of a terminal. The section
+requires `commandInstallers: 0` and the `commands.install` permission.
+
+```json
+"requiresTools": ["go"],
+"commandInstallers": [
+  {
+    "id": "dlv",
+    "commands": ["dlv"],
+    "tool": "go",
+    "minimumVersion": "1.22",
+    "arguments": ["install", "github.com/go-delve/delve/cmd/dlv@latest"],
+    "mayUseNetwork": true,
+    "targets": {
+      "managed": { "environment": { "GOBIN": "${installDirectory}" } },
+      "toolDefault": {
+        "directory": [
+          { "arguments": ["env", "GOBIN"] },
+          { "arguments": ["env", "GOPATH"], "pathList": true, "append": "bin" }
+        ]
+      }
+    }
+  }
+]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | Lowercase letters, digits and `-`, at most 64 characters; unique within the plugin. |
+| `commands` | 1 to 8 bare command names the installation provides. Each one is named by a `systemCommand` launch of this manifest (a language server, build provider, VCS provider, debug adapter or the backend) and by no other installer. |
+| `tool` | The tool-definition ID, listed in `requiresTools`, whose executable runs the installation and the directory probes. |
+| `minimumVersion` | Optional lowest version of `tool`: one to three dotted numbers. |
+| `arguments` | Arguments after the tool's executable, used by a target that does not replace them. Literal: no template variables. |
+| `mayUseNetwork` | Required: whether the installation may download. The host shows it before the user confirms. |
+| `timeoutSeconds` | How long the host lets the installation run, 1 to 3600; 600 when absent. |
+| `targets` | Where the commands may land: `managed`, `toolDefault`, or both. At least one. |
+
+The user chooses the target when installing:
+
+- **`managed`** installs into a directory the host owns for the plugin, in its
+  application data and never in the app bundle, the installation directory or
+  the plugin package; the host removes it with the plugin. `arguments`
+  (optional, replaces the installer's) and `environment` (variables set over
+  the tool's environment) may use `${installDirectory}`, the only template
+  variable of this section, and together must use it at least once.
+  `commandDirectory` is a package-style relative path, below the install
+  directory, of the directory the commands land in; the install directory
+  itself when absent.
+- **`toolDefault`** installs wherever the tool installs when it is told
+  nothing. `arguments` and `environment` are literal. `directory` lists up to
+  4 probes, tried in order: runs of the same tool with non-empty literal
+  `arguments` whose standard output names the directory the commands land in.
+  With `pathList: true` the first non-empty entry of a list in the host's path
+  separator counts; `append` is a package-style relative path added to the
+  printed directory. Without probes the host can say only that the tool
+  decides.
+
+At most 16 installers, 64 arguments per list, 16 environment variables per
+target, and 4096 bytes per argument or value. An environment name is uppercase
+letters, digits and `_`, not starting with a digit. Only `systemCommand`
+launches are served: a build system's or execution provider's executable
+resolved through `invocation.executables` is not.
+
+The host never installs on its own:
+
+1. `plugins.commandInstallers.requirements` lists each `systemCommand` launch
+   with its commands and their installer, `null` when none provides it. The
+   host looks each command up as the launch does and offers the installer of a
+   missing one.
+2. For `toolDefault`, the host runs each probe with the resolved `tool` and
+   sends their outputs to `plugins.commandInstallers.defaultDirectory`, which
+   answers the directory, or `null` when no probe named an absolute one.
+3. The host shows the tool, the expanded command line, whether it uses the
+   network and the directory of each target, and lets the user choose one.
+4. `plugins.commandInstallers.plan` expands the chosen target. The host runs
+   `tool` with `arguments` and `environment` under `timeoutMilliseconds`,
+   shows the output, lets the user cancel, and then checks that every command
+   is in `commandDirectory` (`managed`) or in the default directory
+   (`toolDefault`).
+5. Later launches of the plugin find the commands there: the host adds the
+   plugin's managed command directory and the default directories it recorded
+   to the lookup of that plugin's `systemCommand` launches.
+
+Every installer is a program of the [install review](#trust-and-install-review)
+(`kind: "commandInstaller"` with its fields), so a change to what it runs is
+approved again. See
+[`command-installer.plugin.json`](fixtures/command-installers/command-installer.plugin.json)
+and the golden cases in
+[`command-installer-plans.json`](fixtures/command-installers/command-installer-plans.json).
+
 ## Permissions and activation
 
 | Permission | Required when |
@@ -1152,6 +1251,7 @@ before running it. See [`build-toolchains.plugin.json`](fixtures/build-systems/b
 | `debug.launch` | `debugAdapters` is not empty |
 | `debug.attach` | an adapter lists `attach` in `requests` (and only then); it also covers attaching to a remote host and port |
 | `project.generate` | `projectGenerators` is not empty |
+| `commands.install` | `commandInstallers` is not empty (and only then); permits running the declared installations after the user confirms each, nothing else |
 | `ui.contribute` | `ui` is declared |
 | `ui.web` | a tool window shows [web content](#web-content) |
 | `backend.launch` | `backend` is declared |
@@ -4075,6 +4175,14 @@ command payload is a Core `invalid_request` failure instead.
 | `plugin.download.failed` | Host | An index or archive could not be downloaded |
 | `plugin.signature.missing`, `plugin.signature.invalid`, `plugin.signature.untrusted` | Host | Package signature problems |
 | `plugin.launch.missing` | Host | The packaged language server is missing or not executable |
+| `plugin.command.missing` | Host | None of the commands a `systemCommand` launch names is on `PATH`, in the plugin's managed command directory, or in a default directory the host recorded; the host offers the [command installer](#command-installers) when there is one |
+| `plugin.commandInstaller.unknown` | Core | `installerID` names no command installer of the plugin |
+| `plugin.commandInstaller.targetUndeclared` | Core | The installer does not declare the requested target (`field: "target"`), or has no `toolDefault` to read a default directory for (`field: "installerID"`) |
+| `plugin.commandInstaller.directoryInvalid` | Core | A `managed` plan has no absolute `installDirectory` for this platform, or a `toolDefault` plan was sent one |
+| `plugin.commandInstaller.probeOutputsInvalid` | Core | `outputs` does not hold one entry for each directory probe |
+| `plugin.commandInstaller.failed` | Host | The installation exited unsuccessfully |
+| `plugin.commandInstaller.timedOut` | Host | The installation ran past `timeoutMilliseconds` and was stopped |
+| `plugin.commandInstaller.commandsMissing` | Host | The installation finished but a command it provides is not in its directory |
 | `plugin.runtime.missing` | Host | A tool a launch needs cannot be found, or is older than its `minimumVersion`, when the server starts |
 | `plugin.web.unknownMethod` | Host | A plugin page called a bridge method the host does not implement |
 | `plugin.web.invalidRequest` | Host | A bridge call has malformed parameters |

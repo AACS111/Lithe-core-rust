@@ -57,6 +57,10 @@ pub struct DeclarativePluginManifest {
     /// live in `lithe_debug::adapters`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) debug_adapters: Vec<lithe_debug::adapters::DebugAdapterDeclaration>,
+    /// How the host installs bare commands the plugin's `systemCommand`
+    /// launches need; see `command_installers`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) command_installers: Vec<crate::command_installers::CommandInstallerDeclaration>,
     /// Entries of the New Project window. The shape and its validation live
     /// in `lithe_project_generators`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -449,6 +453,9 @@ impl DeclarativePluginManifest {
         }
         if let Some(backend) = &self.backend {
             programs.extend(lithe_plugin_backend::programs(backend));
+        }
+        for installer in &self.command_installers {
+            programs.push(crate::command_installers::programs(installer));
         }
         // Order by kind, then language or tool, then the full serialized
         // value as a total tie-breaker; duplicates (two servers needing the

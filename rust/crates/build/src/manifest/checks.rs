@@ -107,18 +107,6 @@ pub(crate) fn is_tag(value: &str) -> bool {
     is_identifier(value) && value.len() <= MAX_IDENTIFIER
 }
 
-pub(crate) fn is_environment_name(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= MAX_IDENTIFIER
-        && value
-            .chars()
-            .next()
-            .is_some_and(|first| first.is_ascii_uppercase() || first == '_')
-        && value.chars().all(|character| {
-            character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
-        })
-}
-
 /// A file name with no directory part.
 pub(crate) fn is_file_name(value: &str) -> bool {
     is_safe_relative_path(value) && !value.contains('/') && value != "."

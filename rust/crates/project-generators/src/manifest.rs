@@ -3,7 +3,8 @@
 use super::template::{self, Source, Variable};
 use lithe_plugin_model::settings::is_setting_identifier;
 use lithe_plugin_model::{
-    invalid, is_bare_command, is_safe_relative_path, TemplatePart, UIIcon, Validation,
+    invalid, is_bare_command, is_environment_name, is_safe_relative_path, TemplatePart, UIIcon,
+    Validation,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -953,14 +954,5 @@ fn is_option_value(value: &str) -> bool {
         && value.len() <= MAX_LABEL
         && value.chars().all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
-        })
-}
-
-fn is_environment_name(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 64
-        && !value.starts_with(|character: char| character.is_ascii_digit())
-        && value.chars().all(|character| {
-            character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
         })
 }

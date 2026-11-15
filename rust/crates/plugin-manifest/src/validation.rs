@@ -271,6 +271,9 @@ impl DeclarativePluginManifest {
                 runtime_tools,
             })?;
         }
+        // Installers serve the launches above, so they are checked against
+        // the validated program list.
+        self.validate_command_installers(runtime_tools)?;
         self.validate_permissions()?;
         self.validate_activation_events()?;
         Ok(self)
@@ -320,6 +323,10 @@ impl DeclarativePluginManifest {
             (
                 capabilities::DEBUG_ADAPTERS,
                 !self.debug_adapters.is_empty(),
+            ),
+            (
+                capabilities::COMMAND_INSTALLERS,
+                !self.command_installers.is_empty(),
             ),
             (capabilities::BACKEND, self.backend.is_some()),
             (

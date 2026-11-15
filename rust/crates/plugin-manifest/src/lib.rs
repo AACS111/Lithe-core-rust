@@ -21,16 +21,17 @@ use lithe_plugin_model::settings::{
     MAX_SETTINGS, MAX_SETTING_ACTIONS,
 };
 use lithe_plugin_model::{
-    decode_payload, invalid, invalid_template, is_bare_command, is_identifier,
+    decode_payload, invalid, invalid_template, is_bare_command, is_environment_name, is_identifier,
     is_official_namespace, is_plugin_id, is_safe_relative_path, is_semantic_version, outcome,
-    parse_template_with, regex_literal, sorted_unique, PluginRejection, TemplatePart, UIIcon,
-    Validation,
+    parse_template_with, regex_literal, sorted_unique, validate_minimum_version, PluginRejection,
+    TemplatePart, UIIcon, Validation,
 };
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod command_installers;
 mod commands;
 mod declarations;
 mod launch;
@@ -45,6 +46,10 @@ mod templates;
 mod ui;
 mod validation;
 
+pub use command_installers::{
+    command_installer_default_directory_command, command_installer_plan_command,
+    command_installer_requirements_command,
+};
 pub use commands::*;
 pub use launch::*;
 pub use manifest::*;
