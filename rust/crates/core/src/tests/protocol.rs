@@ -97,6 +97,30 @@ fn debug_adapter_endpoint_validation_crosses_the_json_boundary() {
 }
 
 #[test]
+fn debug_adapter_announcements_cross_the_json_boundary() {
+    let fixture: Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/debug/adapter-announcements-v1.json"
+    )))
+    .expect("announcement fixture is JSON");
+    for case in fixture["cases"].as_array().expect("announcement cases") {
+        let request = serde_json::json!({
+            "id": "read-announcement", "command": "debug.adapters.readAnnouncement", "payload": case["input"]
+        });
+        let response: Value = serde_json::from_str(&execute_json(&request.to_string()))
+            .expect("announcement response is JSON");
+        assert_eq!(response["id"], "read-announcement");
+        match case.get("result") {
+            Some(result) => {
+                assert_eq!(response["ok"], true, "{case}");
+                assert_eq!(response["data"], *result, "{case}");
+            }
+            None => assert_eq!(response["error"]["code"], "invalid_request", "{case}"),
+        }
+    }
+}
+
+#[test]
 fn debug_transport_commands_cross_the_json_boundary() {
     let call = |command: &str, payload: Value| -> Value {
         let request =

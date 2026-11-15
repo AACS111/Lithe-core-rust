@@ -196,6 +196,18 @@
       "expected": {"code": "debug.target.invalid", "field": "target.path"}
     },
     {
+      "id": "missing-target-directory",
+      "layer": "corePlan",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"program": "target.directory"}}}}],
+      "expected": {"code": "debug.target.invalid", "field": "target.path"}
+    },
+    {
+      "id": "target-directory-of-a-bare-file-name",
+      "layer": "corePlan",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"program": "target.directory"}}}}, {"op": "set", "path": "/context/target/path", "value": "main.go"}],
+      "expected": {"code": "debug.target.invalid", "field": "target.path"}
+    },
+    {
       "id": "executable-without-binding",
       "layer": "coreManifest",
       "edits": [{"op": "set", "path": "/block/settings", "value": [{"id": "program", "type": "file", "title": "Program", "default": "", "scope": "project", "effect": "nextRun"}]}, {"op": "set", "path": "/context/manifestMetadata/requires/settings", "value": 0}, {"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"executable": {"setting": "program", "candidates": ["${workspaceFolder}/build/app"]}}}}],

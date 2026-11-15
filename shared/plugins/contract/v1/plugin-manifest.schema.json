@@ -683,8 +683,8 @@
           "minProperties": 1,
           "properties": {
             "program": {
-              "description": "`target.path` is the target's own path. `target.executable` is the program the host found through `executable`, which then must be declared.",
-              "enum": ["target.path", "target.executable"]
+              "description": "`target.path` is the target's own path. `target.directory` is the directory containing `target.path`, for adapters that debug a package. `target.executable` is the program the host found through `executable`, which then must be declared.",
+              "enum": ["target.path", "target.directory", "target.executable"]
             },
             "processId": {
               "const": "target.processID"

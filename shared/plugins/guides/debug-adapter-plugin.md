@@ -71,7 +71,7 @@
 - 每个适配器都要有一条 `onDebug:<id>` 激活事件，并声明 `debug.launch` 权限。适配器列出 `attach` 时才需要（也只能声明）`debug.attach`。
 - `selectors` 决定 Lithe 在哪些目标上自动选这个适配器：`targetKinds` 是目标种类，`languageIDs` 是语言。不写 `selectors` 表示只能被用户显式选择。
 - `languages[]` 声明适配器服务的语言。如果这个语言已经由别的插件提供（例如 Rust），你的声明只会给它增加“可以调试”的能力，并并入你声明的文件扩展名；语言名、语言标识和语言服务器不变，装上调试器也不会重启正在运行的语言服务器。
-- `targetBindings` 把调试目标的事实填进适配器的启动参数：`program` ← 目标路径，`cwd` ← 工作目录，`processId` ← 进程 ID。只填 `arguments` 里没写的字段，不会覆盖你显式写出的默认值。目标缺少绑定要读的事实时，Lithe 会拒绝这次启动并说明缺什么。
+- `targetBindings` 把调试目标的事实填进适配器的启动参数：`program` ← 目标路径（`target.path`），或目标所在目录（`target.directory`，Delve 这类按包构建再调试的适配器用它），`cwd` ← 工作目录，`processId` ← 进程 ID。只填 `arguments` 里没写的字段，不会覆盖你显式写出的默认值。目标缺少绑定要读的事实时，Lithe 会拒绝这次启动并说明缺什么。
 - `configurationTypes` 声明适配器对应的 `launch.json` `type`，用于导入用户已有的 VS Code 风格配置。
 
 ### 3. 怎么启动适配器
@@ -86,7 +86,17 @@
 
 `runSelectedRuntime.tool` 的规则见契约的 [Tool references](../contract/v1/README.md#tool-references)。
 
-`launch.transport` 是 `stdio`，或者 TCP（`tcpAnnounced`：适配器在输出里打印端口；`tcpPort`：固定端口）。TCP 只允许回环地址。
+`launch.transport` 是 `stdio`，或者 TCP（`tcpAnnounced`：适配器在输出里打印端口；`tcpPort`：固定端口）。TCP 只允许回环地址。只能监听 TCP 的适配器（例如 `dlv dap`）用 `tcpAnnounced` 让它自己选空闲端口：
+
+```json
+"launch": {
+  "process": { "launch": { "kind": "systemCommand", "commands": ["dlv"] }, "arguments": ["dap"] },
+  "transport": "tcpAnnounced",
+  "endpoint": { "stream": "stdout", "prefix": "DAP server listening at: ", "value": "hostPort" }
+}
+```
+
+宿主逐行读 `stream`，第一行含 `prefix` 的输出就是公告，前缀之后是端点；10 秒内没有合法的回环端点，启动失败。
 
 插件包和 Lithe 的安装目录运行时是只读的，适配器不能往里面写日志、索引或状态，否则会破坏代码签名和增量更新。宿主会把适配器的状态放在它自己的可写目录下，不放进插件包或安装目录。
 
@@ -258,7 +268,7 @@ Key points:
 - Every adapter needs an `onDebug:<id>` activation event and the `debug.launch` permission. `debug.attach` is needed (and allowed) only when the adapter lists `attach`.
 - `selectors` decide on which targets Lithe picks this adapter automatically: `targetKinds` are target kinds and `languageIDs` are languages. Without `selectors`, the adapter can only be chosen explicitly by the user.
 - `languages[]` declares the languages the adapter serves. If another plugin already provides the language (for example Rust), your declaration only adds the ability to debug it and merges in the file extensions you declare; the language name, language ID, and language server stay the same, and installing the debugger does not restart a running language server.
-- `targetBindings` fills facts about the debug target into the adapter's launch arguments: `program` ← the target path, `cwd` ← the working directory, `processId` ← the process ID. Only fields missing from `arguments` are filled; defaults you wrote explicitly are never overwritten. When the target lacks a fact a binding reads, Lithe refuses the launch and says what is missing.
+- `targetBindings` fills facts about the debug target into the adapter's launch arguments: `program` ← the target path (`target.path`) or the directory containing it (`target.directory`, for an adapter such as Delve that builds and debugs a package), `cwd` ← the working directory, `processId` ← the process ID. Only fields missing from `arguments` are filled; defaults you wrote explicitly are never overwritten. When the target lacks a fact a binding reads, Lithe refuses the launch and says what is missing.
 - `configurationTypes` declares the `launch.json` `type` values the adapter matches, used to import the user's existing VS Code-style configurations.
 
 ### 3. Launching the adapter
@@ -273,7 +283,17 @@ Key points:
 
 For the rules on `runSelectedRuntime.tool`, see [Tool references](../contract/v1/README.md#tool-references) in the contract.
 
-`launch.transport` is `stdio` or TCP (`tcpAnnounced`: the adapter prints its port in its output; `tcpPort`: a fixed port). TCP allows only loopback addresses.
+`launch.transport` is `stdio` or TCP (`tcpAnnounced`: the adapter prints its port in its output; `tcpPort`: a fixed port). TCP allows only loopback addresses. An adapter that only listens on TCP (for example `dlv dap`) uses `tcpAnnounced` so it picks a free port itself:
+
+```json
+"launch": {
+  "process": { "launch": { "kind": "systemCommand", "commands": ["dlv"] }, "arguments": ["dap"] },
+  "transport": "tcpAnnounced",
+  "endpoint": { "stream": "stdout", "prefix": "DAP server listening at: ", "value": "hostPort" }
+}
+```
+
+The host reads `stream` line by line; the first line that contains `prefix` is the announcement, and the endpoint follows the prefix. Without a valid loopback endpoint within 10 seconds the start fails.
 
 The plugin package and the Lithe install directory are read-only at run time. An adapter must not write logs, indexes, or state there, or it breaks code signing and delta updates. The host keeps the adapter's state in its own writable directory, never in the plugin package or the install directory.
 

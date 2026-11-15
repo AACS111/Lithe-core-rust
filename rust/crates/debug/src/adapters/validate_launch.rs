@@ -128,16 +128,7 @@ impl DebugLaunch {
                 "A TCP transport needs an endpoint.",
             )),
             (DebugTransport::TcpAnnounced, Some(endpoint)) => {
-                let valid = endpoint.port.is_none()
-                    && !endpoint.has_language_server_fields()
-                    && matches!(endpoint.stream.as_deref(), Some("stdout" | "stderr"))
-                    && matches!(endpoint.value.as_deref(), Some("port" | "hostPort"))
-                    && endpoint.prefix.as_deref().is_some_and(|prefix| {
-                        !prefix.is_empty()
-                            && prefix.len() <= MAX_ENDPOINT_PREFIX
-                            && !prefix.contains(['\r', '\n', '\0'])
-                    });
-                if valid {
+                if endpoint.is_announced() {
                     Ok(())
                 } else {
                     Err(invalid(
@@ -194,5 +185,19 @@ impl DebugLaunch {
 impl DebugEndpoint {
     fn has_language_server_fields(&self) -> bool {
         self.language_id.is_some() || self.command.is_some()
+    }
+
+    /// Whether this is a well-formed `tcpAnnounced` endpoint: a stream, a
+    /// one-line prefix and `port` or `hostPort`, and nothing else.
+    pub(crate) fn is_announced(&self) -> bool {
+        self.port.is_none()
+            && !self.has_language_server_fields()
+            && matches!(self.stream.as_deref(), Some("stdout" | "stderr"))
+            && matches!(self.value.as_deref(), Some("port" | "hostPort"))
+            && self.prefix.as_deref().is_some_and(|prefix| {
+                !prefix.is_empty()
+                    && prefix.len() <= MAX_ENDPOINT_PREFIX
+                    && !prefix.contains(['\r', '\n', '\0'])
+            })
     }
 }
