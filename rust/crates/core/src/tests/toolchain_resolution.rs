@@ -1074,3 +1074,46 @@ fn consumer_preferences_json_dispatcher_preserves_the_value_boundary() {
         json!({"home":"/fixture/sdk-one"})
     );
 }
+
+#[test]
+fn global_toolchain_discovery_and_defaults_need_no_project_directory() {
+    let mut value = input();
+    value["global"] = json!(true);
+    value["workspaceRoot"] = json!("");
+    value["filesystem"] = json!([]);
+    installation(&mut value, HOME, "21.0.4");
+    value["systemInstallations"] = json!([{"tool":"java","home":HOME}]);
+    value["globalDefault"] = json!({"home":HOME});
+    let result = resolve_command(value.clone(), validated_manifest_json).unwrap();
+    assert_eq!(result["status"], "ok", "{result}");
+    assert_eq!(result["resolution"]["outcome"]["selection"]["home"], HOME);
+    let mut listing = value_for_candidates(&value);
+    listing["global"] = json!(true);
+    let candidates = candidates_command(listing, validated_manifest_json).unwrap();
+    assert_eq!(candidates["status"], "ok", "{candidates}");
+    assert_eq!(candidates["candidates"]["installations"][0]["home"], HOME);
+}
+
+#[test]
+fn global_toolchain_mode_refuses_project_pins_and_ignores_project_executables() {
+    let mut value = input();
+    value["global"] = json!(true);
+    value["workspaceRoot"] = json!("");
+    value["filesystem"] = json!([]);
+    installation(&mut value, HOME, "21.0.4");
+    value["systemInstallations"] = json!([{"tool":"java","home":HOME}]);
+    value["globalDefault"] = json!({"home":HOME});
+    value["registry"]["plugins"][0]["manifest"]["toolDefinitions"][0]["executables"].as_array_mut().unwrap().insert(1,
+        json!({"id":"project-env","kind":"projectFile","projectKind":"environment","home":".venv","path":".venv/bin/java","platforms":["macos","linux"]}));
+    value["projectCodeAllowed"] = json!(true);
+    let result = resolve(&value);
+    assert_eq!(result["outcome"]["selection"]["home"], HOME);
+    assert!(!result["trace"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["candidate"] == "project-env"));
+    value["local"] = local_pins();
+    let rejected = resolve_command(value, validated_manifest_json).unwrap();
+    assert_eq!(rejected["status"], "rejected", "{rejected}");
+}

@@ -33,6 +33,12 @@ pub(super) fn dispatch(
         ToolchainsCommand::EditPins => {
             plugin_response(id, payload, crate::toolchain::edit_pins_command)
         }
+        ToolchainsCommand::CatalogState => {
+            plugin_response(id, payload, crate::toolchain::catalog_state_command)
+        }
+        ToolchainsCommand::EditCatalog => {
+            plugin_response(id, payload, crate::toolchain::edit_catalog_command)
+        }
         ToolchainsCommand::PinStoragePlan => {
             plugin_response(id, payload, crate::toolchain::pin_storage_plan_command)
         }

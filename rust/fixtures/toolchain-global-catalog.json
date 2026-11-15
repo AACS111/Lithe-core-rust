@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "name": "missing-global-source-is-read-only",
+      "command": "toolchains.catalogState",
+      "input": {
+        "document": null,
+        "platform": "macos"
+      },
+      "expected": {
+        "status": "ok",
+        "state": {
+          "document": {
+            "version": 1,
+            "tools": {}
+          },
+          "storage": {
+            "relativePath": "toolchains/global.json",
+            "maximumBytes": 262144
+          }
+        }
+      }
+    },
+    {
+      "name": "automatic-without-registrations-creates-no-file",
+      "command": "toolchains.editCatalog",
+      "input": {
+        "document": null,
+        "platform": "linux",
+        "edits": [
+          {
+            "tool": "vm",
+            "homes": [],
+            "defaultHome": null
+          }
+        ]
+      },
+      "expected": {
+        "status": "ok",
+        "edit": {
+          "changed": false,
+          "document": null,
+          "catalog": {
+            "version": 1,
+            "tools": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "windows-aliases-refused",
+      "command": "toolchains.catalogState",
+      "input": {
+        "document": "{\"version\":1,\"tools\":{\"vm\":{\"homes\":[\"C:/SDK\",\"c:\\\\sdk\"]}}}",
+        "platform": "windows"
+      },
+      "error": "plugin.toolchain.invalidDocument"
+    }
+  ]
+}

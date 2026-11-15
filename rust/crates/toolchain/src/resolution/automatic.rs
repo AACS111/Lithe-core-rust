@@ -125,6 +125,7 @@ pub(crate) fn candidates(input: &Value, validate_manifest: ManifestValidator) ->
             "platform",
             "filesystemCaseSensitive",
             "workspaceRoot",
+            "global",
             "workspaceRoots",
             "filesystem",
             "minimumVersion",

@@ -120,11 +120,27 @@ pub(crate) fn prepare<'a>(
         })
         .transpose()?
         .unwrap_or(platform != "windows");
-    let root = input["workspaceRoot"]
-        .as_str()
-        .and_then(|root| paths::normalize(root, platform, true))
-        .ok_or_else(|| reject("workspaceRoot"))?;
-    let mut roots = vec![root.clone()];
+    let global = input
+        .get("global")
+        .map(|value| value.as_bool().ok_or_else(|| reject("global")))
+        .transpose()?
+        .unwrap_or(false);
+    let root = if global {
+        if input["workspaceRoot"] != "" {
+            return Err(reject("workspaceRoot"));
+        }
+        String::new()
+    } else {
+        input["workspaceRoot"]
+            .as_str()
+            .and_then(|root| paths::normalize(root, platform, true))
+            .ok_or_else(|| reject("workspaceRoot"))?
+    };
+    let mut roots = if global {
+        Vec::new()
+    } else {
+        vec![root.clone()]
+    };
     for value in array(input, "workspaceRoots", 64)? {
         roots.push(
             value
@@ -169,11 +185,12 @@ pub(crate) fn prepare<'a>(
     snapshot.validate_facts()?;
     snapshot.targets = query::implied_targets(facts, platform, case_sensitive)
         .map_err(|_| reject("filesystem"))?;
-    if snapshot.key(
-        snapshot.fact(&root, "directory")?["canonicalPath"]
-            .as_str()
-            .ok_or_else(|| reject("workspaceRoot"))?,
-    )? != snapshot.key(&root)?
+    if !global
+        && snapshot.key(
+            snapshot.fact(&root, "directory")?["canonicalPath"]
+                .as_str()
+                .ok_or_else(|| reject("workspaceRoot"))?,
+        )? != snapshot.key(&root)?
     {
         return Err(reject("workspaceRoot"));
     }

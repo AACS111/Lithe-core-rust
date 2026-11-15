@@ -485,6 +485,8 @@ or removing a command fails until the table changes in the same commit.
 | `toolchains.failureReply` | Build the JSON-RPC error reply for a query that missed its deadline or found no backend, so the host passes it to `toolchains.decodeReply` like a provider's own error; cancellation has none |
 | `toolchains.resolvePins` | Validate a captured local document and find the nearest ancestor directory pin, retaining dormant and legacy entries without probing or writing |
 | `toolchains.editPins` | Apply one bounded batch of directory pin edits to a captured local document without writing native files |
+| `toolchains.catalogState` | Validate machine-wide SDK registrations without a project |
+| `toolchains.editCatalog` | Merge confirmed machine-wide SDK registrations and defaults |
 | `toolchains.pinStoragePlan` | Declare bounded workspace-native pin and ignore sources |
 | `toolchains.decodePinDocument` | Validate a complete native source or supply the absent-source default |
 | `toolchains.editPinSources` | Plan deterministic pin and Git ignore source edits without native I/O |
@@ -6509,3 +6511,43 @@ and executable exports, then resolves/probes the main build tool in that same
 environment. User-configured invocation environment retains its existing
 precedence. Host-managed runtime candidates are explicit `runtime` plans; hosts
 must not infer executable names from opaque runtime IDs.
+
+
+### Global SDK registrations without an open project
+
+`toolchains.catalogState` accepts `{document:string|null,platform,filesystemCaseSensitive?}`
+and returns `{status:"ok",state:{document,storage:{relativePath:"toolchains/global.json",maximumBytes:262144}}}`.
+Native clients resolve the relative path below their platform user-preference directory,
+never below a workspace, SDK, installed package or application bundle. Reading an absent
+source returns `{version:1,tools:{}}` and must not create a directory or file.
+
+`toolchains.editCatalog` accepts the same source fields and a nonempty `edits` array of
+`{tool,homes:[absoluteHome],defaultHome:string|null}`. Each edit replaces only that tool's
+registrations and default; other tools, including dormant plugins, remain intact. At most
+64 tools and 32 distinct homes per tool are accepted. Native platform path normalization
+and case identity apply before deduplication. A selected default is registered if needed;
+null clears only the default. Empty registrations plus null remove the tool entry.
+The result is `{status:"ok",edit:{changed,document:string|null,catalog}}`; unchanged edits
+return a null replacement and must not create a source. Invalid shapes, duplicate JSON keys,
+unknown fields, relative homes, aliases and oversized documents reject with
+`plugin.toolchain.invalidDocument`. The schema is
+[`toolchain-global-v1.schema.json`](toolchain-global-v1.schema.json); cross-client vectors
+are in `rust/fixtures/toolchain-global-catalog.json`.
+
+Native clients retain the exact bytes and filesystem identity privately, verify them before
+atomic publication, and reread after Save. Core owns the merge and bounds; the native client
+owns read/write permissions, conflict detection and installation probing. Registrations
+contain no cached version authority and never modify SDK directories. This user-settings
+resource does not affect code signatures or update deltas.
+
+`toolchains.candidates` and `toolchains.resolve` accept optional `global:true` with
+`workspaceRoot:""`, allowing discovery and inspection before a project is open. Global mode
+requires an empty local pin document, never selects project wrappers, project environments,
+project settings or project provider statements, and does not require a fictitious workspace
+filesystem fact. Additional `workspaceRoots` remain exclusion roots. Normal requests still
+require the real project root. Native callers supply registered homes as ordinary
+`systemInstallations` and the current catalog default as `globalDefault:{home}`; the
+existing precedence remains fixed consumer choice, project override, global default, then
+automatic discovery. Clearing the global default exposes live automatic selection without
+removing manual registrations. Each new consumer resolves fresh facts and probes; already
+running processes retain their launch-time environment.
