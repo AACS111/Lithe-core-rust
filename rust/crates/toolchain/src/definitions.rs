@@ -125,6 +125,20 @@ fn strings(
     Ok(())
 }
 
+/// A word of a version probe: a subcommand, or the name of a flag.
+fn probe_word(word: &str) -> bool {
+    word.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+        && word.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+}
+
+/// A version probe flag such as `-version` or `--version`, without a value.
+fn probe_flag(argument: &str) -> bool {
+    argument
+        .strip_prefix("--")
+        .or_else(|| argument.strip_prefix('-'))
+        .is_some_and(probe_word)
+}
+
 fn command(value: &str) -> bool {
     value.len() <= 64
         && value
@@ -546,14 +560,21 @@ fn definition(plugin_id: &str, value: &Value) -> Validation<()> {
         "version",
     )?;
     strings(&version["arguments"], 1, 8, "version.arguments", |arg| {
-        let flag = arg
-            .strip_prefix("--")
-            .or_else(|| arg.strip_prefix('-'))
-            .unwrap_or("");
-        arg.len() <= 64
-            && flag.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
-            && flag.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        arg.len() <= 64 && (probe_word(arg) || probe_flag(arg))
     })?;
+    // Some tools print their version only for a subcommand (`go version`,
+    // `zig version`). A bare word after the first would be an operand, such
+    // as a script for the tool to run, which a probe must never pass.
+    if version["arguments"].as_array().is_some_and(|arguments| {
+        arguments[1..]
+            .iter()
+            .any(|arg| !arg.as_str().is_some_and(probe_flag))
+    }) {
+        return Err(invalid(
+            "version.arguments",
+            "Only the first argument may be a subcommand; the others must be flags.",
+        ));
+    }
     let pattern = text(&version["pattern"], 512, "version.pattern")?;
     if Regex::new(pattern).map_or(true, |regex| regex.captures_len() < 2) {
         return Err(invalid(

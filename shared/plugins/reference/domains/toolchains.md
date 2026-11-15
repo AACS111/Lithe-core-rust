@@ -29,6 +29,8 @@
 
 声明式原语已经冻结：根目录只有 `home`、`environment`、`absolute` 三种，通配只有单段 `*`。新的安装形状由提供者回答，不再增加根目录类型或宿主解析器。没有 `watchFiles` 的提供者只报告安装，应答里不能有版本要求。
 
+版本探针 `version.arguments` 的第一个参数可以是选项（`-version`、`--version`），也可以是子命令（Go 这类只用 `go version` 打印版本的工具写 `version`）；之后的参数只能是选项，选项不带 `=值`。第一个参数之后出现不带 `-` 的词就拒绝，所以探针不会把脚本、文件之类的操作数交给工具。
+
 ### 选择顺序
 
 | 层 | 规则 |
@@ -182,6 +184,8 @@ A tool may use one route, both, or neither (relying only on pins, project files,
 | Provider query | `toolchainProviders[]` answering `toolchains/query` | Locations those primitives cannot express: registries, property lists, manager databases, command output, manager-specific version files | The provider's packaged backend |
 
 The declarative primitives are frozen: root kinds are `home`, `environment`, and `absolute`, and patterns are single-component `*` globs. A new installation shape is answered by a provider, not by a new root kind or host parser. A provider without `watchFiles` only reports installations, and its replies may not contain version requirements.
+
+The first argument of the version probe `version.arguments` is a flag (`-version`, `--version`) or a subcommand (`version`, for a tool such as Go that prints its version only with `go version`); every later argument is a flag, and flags carry no `=value`. A bare word after the first argument is refused, so a probe never hands the tool an operand such as a script or a file.
 
 ### Selection order
 
