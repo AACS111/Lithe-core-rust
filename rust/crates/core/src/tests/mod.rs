@@ -42,6 +42,7 @@ mod keymap_import;
 mod language_server_sessions;
 mod lsp_policy;
 mod marketplace_plugins;
+mod notification_read;
 mod plugin_editor_resources;
 mod plugin_run_debug;
 mod plugin_settings_documents;

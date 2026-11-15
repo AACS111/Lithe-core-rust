@@ -1,0 +1,326 @@
+{
+  "version": 1,
+  "command": "workbench.notifications.reduceReadState",
+  "cases": [
+    {
+      "name": "first unread arrival",
+      "payload": {
+        "state": {
+          "unreadIds": []
+        },
+        "action": {
+          "kind": "arrived",
+          "id": 1,
+          "historyVisible": false
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": [
+            1
+          ]
+        },
+        "unreadCount": 1
+      }
+    },
+    {
+      "name": "repeated unread is counted once",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            2,
+            1
+          ]
+        },
+        "action": {
+          "kind": "arrived",
+          "id": 1,
+          "historyVisible": false
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": [
+            1,
+            2
+          ]
+        },
+        "unreadCount": 2
+      }
+    },
+    {
+      "name": "read notice becomes unread again",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            2
+          ]
+        },
+        "action": {
+          "kind": "arrived",
+          "id": 1,
+          "historyVisible": false
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": [
+            1,
+            2
+          ]
+        },
+        "unreadCount": 2
+      }
+    },
+    {
+      "name": "viewing either history reads every id",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            7,
+            2,
+            9
+          ]
+        },
+        "action": {
+          "kind": "markAllRead"
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": []
+        },
+        "unreadCount": 0
+      }
+    },
+    {
+      "name": "viewing empty history is idempotent",
+      "payload": {
+        "state": {
+          "unreadIds": []
+        },
+        "action": {
+          "kind": "markAllRead"
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": []
+        },
+        "unreadCount": 0
+      }
+    },
+    {
+      "name": "arrival while history is visible reads the history",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            7,
+            2,
+            9
+          ]
+        },
+        "action": {
+          "kind": "arrived",
+          "id": 4,
+          "historyVisible": true
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": []
+        },
+        "unreadCount": 0
+      }
+    },
+    {
+      "name": "eviction removes its unread id even away from the tail",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            7,
+            2,
+            9
+          ]
+        },
+        "action": {
+          "kind": "arrived",
+          "id": 4,
+          "historyVisible": false,
+          "forgottenId": 2
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": [
+            4,
+            7,
+            9
+          ]
+        },
+        "unreadCount": 3
+      }
+    },
+    {
+      "name": "eviction of read notice leaves other unread ids",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            7,
+            9
+          ]
+        },
+        "action": {
+          "kind": "arrived",
+          "id": 4,
+          "historyVisible": false,
+          "forgottenId": 2
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": [
+            4,
+            7,
+            9
+          ]
+        },
+        "unreadCount": 3
+      }
+    },
+    {
+      "name": "visible arrival also expires old id",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            7,
+            2
+          ]
+        },
+        "action": {
+          "kind": "arrived",
+          "id": 4,
+          "historyVisible": true,
+          "forgottenId": 2
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": []
+        },
+        "unreadCount": 0
+      }
+    },
+    {
+      "name": "unread ids do not depend on display order",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            9,
+            3,
+            7
+          ]
+        },
+        "action": {
+          "kind": "arrived",
+          "id": 3,
+          "historyVisible": false
+        }
+      },
+      "expected": {
+        "state": {
+          "unreadIds": [
+            3,
+            9,
+            7
+          ]
+        },
+        "unreadCount": 3
+      }
+    }
+  ],
+  "errors": [
+    {
+      "name": "zero arrival id",
+      "payload": {
+        "action": {
+          "kind": "arrived",
+          "id": 0,
+          "historyVisible": false
+        }
+      },
+      "error": "invalid_request"
+    },
+    {
+      "name": "duplicate unread ids",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            2,
+            2
+          ]
+        },
+        "action": {
+          "kind": "markAllRead"
+        }
+      },
+      "error": "invalid_request"
+    },
+    {
+      "name": "zero unread id",
+      "payload": {
+        "state": {
+          "unreadIds": [
+            0
+          ]
+        },
+        "action": {
+          "kind": "markAllRead"
+        }
+      },
+      "error": "invalid_request"
+    },
+    {
+      "name": "zero forgotten id",
+      "payload": {
+        "action": {
+          "kind": "arrived",
+          "id": 2,
+          "historyVisible": false,
+          "forgottenId": 0
+        }
+      },
+      "error": "invalid_request"
+    },
+    {
+      "name": "unknown action",
+      "payload": {
+        "action": {
+          "kind": "readPrefix"
+        }
+      },
+      "error": "invalid_request"
+    },
+    {
+      "name": "unknown field",
+      "payload": {
+        "action": {
+          "kind": "markAllRead"
+        },
+        "extra": true
+      },
+      "error": "invalid_request"
+    },
+    {
+      "name": "invalid id type",
+      "payload": {
+        "action": {
+          "kind": "arrived",
+          "id": "notice",
+          "historyVisible": false
+        }
+      },
+      "error": "invalid_request"
+    }
+  ]
+}

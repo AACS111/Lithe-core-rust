@@ -15,6 +15,7 @@ pub const COMMANDS: &[&str] = &[
     visibility::CLASSIFY_VISIBILITY,
     visibility::VISIBILITY_DEFAULTS,
     workbench::REDUCE_CHROME_LAYOUT,
+    workbench::REDUCE_NOTIFICATION_READ_STATE,
 ];
 
 /// Runs one rule on an already decoded payload.
@@ -30,6 +31,7 @@ pub fn execute(command: &str, payload: Value) -> Result<Value, RuleError> {
         visibility::CLASSIFY_VISIBILITY => visibility::classify_visibility_json(payload),
         visibility::VISIBILITY_DEFAULTS => visibility::visibility_defaults_json(payload),
         workbench::REDUCE_CHROME_LAYOUT => workbench::reduce_chrome_layout_json(payload),
+        workbench::REDUCE_NOTIFICATION_READ_STATE => workbench::reduce_read_state_json(payload),
         _ => Err(RuleError::new(
             RuleErrorCode::NotSupported,
             "Unknown rule command",
