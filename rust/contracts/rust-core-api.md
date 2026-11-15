@@ -4132,11 +4132,13 @@ containing `target.path` when the configuration binds it to `target.directory`
 (an adapter such as Delve that builds a package; a path without a directory is
 `debug.target.invalid` with `field: "target.path"`); or from
 `target.executable` (an absolute path the host found) when the configuration
-binds it to `target.executable`. Each `adapterArguments` path is filled the
+binds it to `target.executable`. `cwd` is filled from `target.workingDirectory`,
+or from the directory containing `target.path` when the configuration binds it
+to `target.directory`. Each `adapterArguments` path is filled the
 same way, from `target.path`, the directory containing it (`target.directory`)
 or `target.workingDirectory`, after `env`, so `env.<variable>` adds a variable
 to the bound environment and leaves one the target sets; a target without the
-fact is
+fact a `cwd` or `adapterArguments` binding reads is
 `debug.target.invalid` with `field: "target.path"` or
 `"target.workingDirectory"`. Refusals use the `rejected` shape with
 `debug.provider.stale`, `debug.request.unsupported`, `debug.runtime.stale`, or

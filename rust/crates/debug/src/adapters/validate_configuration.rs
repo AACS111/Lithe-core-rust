@@ -73,7 +73,11 @@ impl DebugConfiguration {
                 &["target.path", TARGET_DIRECTORY, TARGET_EXECUTABLE][..],
             ),
             ("processId", &bindings.process_id, &["target.processID"][..]),
-            ("cwd", &bindings.cwd, &["target.workingDirectory"][..]),
+            (
+                "cwd",
+                &bindings.cwd,
+                &["target.workingDirectory", TARGET_DIRECTORY][..],
+            ),
             ("args", &bindings.args, &["target.arguments"][..]),
             ("env", &bindings.env, &["target.environment"][..]),
         ] {

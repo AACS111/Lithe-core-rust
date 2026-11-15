@@ -698,7 +698,8 @@
               "const": "target.processID"
             },
             "cwd": {
-              "const": "target.workingDirectory"
+              "description": "`target.workingDirectory` is the working directory. `target.directory` is the directory containing `target.path`, for adapters whose program runs where its package is.",
+              "enum": ["target.workingDirectory", "target.directory"]
             },
             "args": { "const": "target.arguments" },
             "env": { "const": "target.environment" },
