@@ -399,6 +399,12 @@ stable error code and a user-facing message:
 }
 ```
 
+A panic inside a request does not cross the C ABI, where it would abort the
+host process. The dispatcher catches it and returns `unknown` with details
+`request_panicked` and the message `Core request failed unexpectedly`. Core
+records the panic as `app.core.panic_interrupted`, with the request's method
+and op, before it returns, so the host does not log the panic again.
+
 ## Commands
 
 The MCP configuration and library commands were removed with the agent-facing MCP

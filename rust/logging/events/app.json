@@ -548,6 +548,122 @@
       },
       "rate": 60,
       "owner": "Lithe"
+    },
+    {
+      "id": "app.core.panic_interrupted",
+      "channel": "app",
+      "level": "error",
+      "message": "Core code panicked at the {boundary} boundary",
+      "fields": {
+        "boundary": {
+          "type": "token",
+          "required": true,
+          "description": "Where the panic ends: request when the dispatcher turned it into a failed response and Core kept running, thread when it unwinds a Core thread whose owner decides what happens next"
+        },
+        "panic": {
+          "type": "text",
+          "required": true,
+          "description": "Panic message from the Rust payload, or a fixed note when the payload is not text",
+          "reason": "A Rust panic message is free text written at the panic site, often with the Debug output of an error, and has no stable code; keep its wording after Core redaction and the 1 KiB cap"
+        },
+        "location": {
+          "type": "text",
+          "required": false,
+          "description": "Source file, line and column the compiler attached to the panic",
+          "reason": "The compiler reports the panic site as a source path with line and column; dependency paths can be absolute, so Core redacts the text and caps it at 1 KiB instead of treating it as a stable identifier"
+        },
+        "method": {
+          "type": "token",
+          "required": false,
+          "description": "Core protocol method the request was running when boundary is request, e.g. git.write"
+        }
+      },
+      "rate": 60,
+      "owner": "lithe-core"
+    },
+    {
+      "id": "app.runtime.panic_interrupted",
+      "channel": "app",
+      "level": "error",
+      "message": "Recovered a panic at {boundary}",
+      "fields": {
+        "boundary": {
+          "type": "token",
+          "required": true,
+          "description": "Recover site: viva: followed by the UI framework boundary such as viva:darwin:appkit-callback, or core:events-observer and core:log-waker for Core callbacks"
+        },
+        "panic": {
+          "type": "text",
+          "required": true,
+          "description": "Panic value as text, as the recovering boundary received it",
+          "reason": "A recovered Go panic value is arbitrary text with no stable code; keep its wording so the failing check can be found, after Core redaction and the 1 KiB cap"
+        },
+        "stack": {
+          "type": "text",
+          "required": false,
+          "description": "Frames of the panicking goroutine from the panic call outward, joined on one line",
+          "reason": "A Go stack trace has no structured equivalent; the host keeps only the frames after the panic call as function file:line pairs with base file names, and Core redacts and caps the text at 1 KiB"
+        }
+      },
+      "rate": 60,
+      "owner": "Lithe"
+    },
+    {
+      "id": "app.window.loop_failed",
+      "channel": "app",
+      "level": "error",
+      "message": "Window loop stopped with an error",
+      "fields": {
+        "error": {
+          "type": "error",
+          "required": true,
+          "description": "Error the UI framework returned when its window loop ended for a reason other than a recovered panic"
+        }
+      },
+      "rate": 60,
+      "owner": "Lithe"
+    },
+    {
+      "id": "app.session.previous_interrupted",
+      "channel": "app",
+      "level": "error",
+      "message": "Previous session ended in a crash",
+      "fields": {
+        "session": {
+          "type": "path",
+          "required": true,
+          "description": "Log directory of the session that crashed, so its last records can be read next to this one"
+        },
+        "panic": {
+          "type": "text",
+          "required": true,
+          "description": "First line the Go runtime printed when the process died, such as panic: or fatal error:",
+          "reason": "The Go runtime prints the cause of a fatal crash only as text in its crash output; keep the first line after Core redaction and the 1 KiB cap"
+        },
+        "stack": {
+          "type": "text",
+          "required": false,
+          "description": "Frames of the goroutine that crashed, from its panic call outward, joined on one line",
+          "reason": "A Go stack trace has no structured equivalent; the host keeps only the frames after the panic call as function file:line pairs with base file names, and Core redacts and caps the text at 1 KiB"
+        }
+      },
+      "rate": 60,
+      "owner": "Lithe"
+    },
+    {
+      "id": "app.session.close_missing",
+      "channel": "app",
+      "level": "warn",
+      "message": "Previous session ended without closing its log",
+      "fields": {
+        "session": {
+          "type": "path",
+          "required": true,
+          "description": "Log directory of the session that was killed, force quit or stopped by a native crash before closing its log"
+        }
+      },
+      "rate": 60,
+      "owner": "Lithe"
     }
   ]
 }

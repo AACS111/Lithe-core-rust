@@ -8,9 +8,11 @@ use std::sync::Once;
 static INSTALL: Once = Once::new();
 
 /// Every Core command and direct IDE/AskPass entry calls this before invoking
-/// helpers or starting workers. Subsequent calls are cheap.
+/// helpers or starting workers. Subsequent calls are cheap. The panic hook is
+/// installed here too, because these are the entries that run Core code.
 pub(crate) fn install() {
     INSTALL.call_once(|| {
+        super::panic_facts::install();
         lithe_git_host::failure_log::install_failure_sink(sink);
         lithe_ide_host::failure_log::install_failure_sink(sink);
         lithe_remote::failure_log::install_failure_sink(sink);

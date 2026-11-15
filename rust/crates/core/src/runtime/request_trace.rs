@@ -217,7 +217,7 @@ fn request_path(payload: &Value) -> Option<String> {
 }
 
 /// Catalog token shape; anything else is omitted rather than failing the record.
-fn token(value: &str) -> Option<String> {
+pub(crate) fn token(value: &str) -> Option<String> {
     (!value.is_empty()
         && value.len() <= 64
         && value

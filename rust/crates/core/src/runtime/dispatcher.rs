@@ -104,7 +104,19 @@ fn execute(request: &str, document: Option<&str>) -> CoreResponse {
     };
     // The trace spans every scope below and records once, after the final response.
     let trace = crate::runtime::request_trace::Request::begin(&parsed);
-    let response = execute_parsed(parsed, document);
+    let id = parsed.id.clone();
+    let method = parsed.command.clone();
+    // A panic here would otherwise unwind into the host and abort it; the
+    // boundary has already recorded it as app.core.panic_interrupted.
+    let response =
+        crate::runtime::panic_facts::request_boundary(&method, || execute_parsed(parsed, document))
+            .unwrap_or_else(|| {
+                CoreResponse::failure(
+                    id,
+                    CoreError::new(ErrorCode::Unknown, "Core request failed unexpectedly")
+                        .with_details("request_panicked"),
+                )
+            });
     trace.finish(&response);
     response
 }
