@@ -2230,6 +2230,66 @@ fn debug_start_arguments_fill_adapter_arguments_from_path_facts() {
 }
 
 #[test]
+fn debug_start_arguments_add_an_adapter_argument_to_the_environment() {
+    let (root, path, directory) = if cfg!(windows) {
+        (r"C:\work", r"C:\work\cmd\app\main.go", r"C:\work\cmd\app")
+    } else {
+        ("/work", "/work/cmd/app/main.go", "/work/cmd/app")
+    };
+    // Delve's shape: `go build` runs in `dlvCwd` and reads the directory from
+    // `PWD`, which Delve leaves at the host's root, so both name the package.
+    let start = |arguments: Value, bindings: Value, target: Value| {
+        let mut manifest = fixture("debug-adapter.plugin.json");
+        manifest["debugAdapters"][0]["configurations"]["launch"]["arguments"] = arguments;
+        manifest["debugAdapters"][0]["configurations"]["launch"]["targetBindings"] = bindings;
+        let outcome = lithe_plugin_manifest::debug_start_arguments_command(json!({
+            "manifest": manifest,
+            "adapterID": "example",
+            "request": "launch",
+            "facts": {
+                "registration": { "generation": 3, "currentGeneration": 3 },
+                "target": target,
+            },
+        }))
+        .expect("payload is well formed");
+        assert_eq!(outcome["status"], "ok", "{outcome}");
+        outcome["arguments"].clone()
+    };
+    let target = json!({ "kind": "file", "path": path, "workingDirectory": root });
+    let into_pwd = json!({ "dlvCwd": "target.directory", "env.PWD": "target.directory" });
+
+    // The variable joins the ones the configuration sets itself.
+    let defaults = start(
+        json!({ "program": ".", "env": { "GO111MODULE": "auto" } }),
+        json!({ "adapterArguments": into_pwd }),
+        target.clone(),
+    );
+    assert_eq!(
+        defaults,
+        json!({
+            "program": ".",
+            "dlvCwd": directory,
+            "env": { "GO111MODULE": "auto", "PWD": directory },
+        })
+    );
+
+    // It joins the target's environment too, and a variable the target sets
+    // itself stays as the target set it.
+    let mut bound = target.clone();
+    bound["environment"] = json!({ "PWD": "/elsewhere", "TOKEN": "1" });
+    let bound = start(
+        json!({}),
+        json!({ "env": "target.environment", "adapterArguments": into_pwd }),
+        bound,
+    );
+    assert_eq!(bound["env"], json!({ "PWD": "/elsewhere", "TOKEN": "1" }));
+
+    // With no environment anywhere, the argument starts one.
+    let created = start(json!({}), json!({ "adapterArguments": into_pwd }), target);
+    assert_eq!(created["env"], json!({ "PWD": directory }));
+}
+
+#[test]
 fn debug_adapter_arguments_survive_manifest_normalization() {
     let mut manifest = fixture("debug-adapter.plugin.json");
     manifest["debugAdapters"][0]["configurations"]["launch"]["targetBindings"]

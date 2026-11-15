@@ -130,8 +130,8 @@ impl DebugConfiguration {
     }
 }
 
-/// Checks the adapter-specific arguments a configuration binds: each is a
-/// top-level name that nothing else sets, read from a path fact.
+/// Checks the adapter-specific arguments a configuration binds: each is an
+/// argument path that nothing else sets, read from a path fact.
 fn validate_adapter_arguments(
     field: &str,
     named: &BTreeMap<String, String>,
@@ -143,18 +143,38 @@ fn validate_adapter_arguments(
             format!("adapterArguments binds 1-{MAX_ADAPTER_ARGUMENTS} arguments."),
         ));
     }
-    for (name, source) in named {
-        if !is_argument_name(name) {
+    for (index, (path, source)) in named.iter().enumerate() {
+        if !is_argument_path(path) {
             return Err(invalid(
                 field,
-                "An argument name is a letter or underscore followed by letters, digits, underscores, or hyphens.",
+                format!(
+                    "An argument path is up to {MAX_ARGUMENT_PATH_DEPTH} names joined by dots, each a letter or underscore followed by letters, digits, underscores, or hyphens."
+                ),
             ));
         }
-        let entry = format!("{field}.{name}");
-        if FIXED_BINDINGS.contains(&name.as_str()) {
-            return Err(invalid(entry, format!("{name} has a binding of its own.")));
+        let entry = format!("{field}.{path}");
+        let (first, inside) = match path.split_once('.') {
+            Some((first, inside)) => (first, Some(inside)),
+            None => (path.as_str(), None),
+        };
+        // The environment binding leaves `env` an object of variables, so a
+        // path may add one variable to it. Every other fixed binding holds a
+        // value that a path can neither replace nor reach into.
+        match inside {
+            Some(inside) if first == ENVIRONMENT_BINDING => {
+                if inside.contains('.') {
+                    return Err(invalid(
+                        entry,
+                        "Inside env, an adapter argument names one variable.",
+                    ));
+                }
+            }
+            _ if FIXED_BINDINGS.contains(&first) => {
+                return Err(invalid(entry, format!("{first} has a binding of its own.")));
+            }
+            _ => {}
         }
-        if crate::backend_start::is_host_key(name) {
+        if crate::backend_start::is_host_key(first) {
             return Err(invalid(
                 entry,
                 "The argument belongs to the host and cannot be set by a plugin.",
@@ -169,12 +189,24 @@ fn validate_adapter_arguments(
                 ),
             ));
         }
-        // A binding only fills an argument the defaults leave out, so a
-        // default of the same name would make the binding dead.
-        if defaults.is_some_and(|defaults| defaults.contains_key(name)) {
+        // Two paths would fill one value twice, or one inside the other.
+        if let Some(other) = named
+            .keys()
+            .take(index)
+            .find(|other| paths_overlap(path, other))
+        {
             return Err(invalid(
                 entry,
-                "The argument is already set by the configuration's own arguments.",
+                format!("The argument path overlaps {other}."),
+            ));
+        }
+        // A binding only fills an argument the defaults leave out, so a
+        // default at the path would make the binding dead, and a default
+        // that is not an object on the way would leave it nowhere to go.
+        if defaults.is_some_and(|defaults| default_occupies(defaults, path)) {
+            return Err(invalid(
+                entry,
+                "The argument path is already set by the configuration's own arguments.",
             ));
         }
     }

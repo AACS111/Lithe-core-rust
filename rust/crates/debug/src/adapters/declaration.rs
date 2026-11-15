@@ -158,11 +158,13 @@ pub struct DebugTargetBindings {
     /// Where a remote `host:port` goes. Attach only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) connection: Option<DebugConnectionBinding>,
-    /// Top-level arguments only this adapter defines, each filled from a path
-    /// fact of the target: `target.path`, `target.directory` or
-    /// `target.workingDirectory`. Delve, for example, builds the program in
-    /// `dlvCwd` rather than in its own working directory, which a host sets
-    /// to the workspace root.
+    /// Argument paths only this adapter defines, each filled from a path fact
+    /// of the target: `target.path`, `target.directory` or
+    /// `target.workingDirectory`. A path is dotted like a connection
+    /// destination, and inside `env` it names one variable. Delve, for
+    /// example, builds the program in `dlvCwd` rather than in its own working
+    /// directory, which a host sets to the workspace root, and the build reads
+    /// the directory from `env.PWD` when the path passes a symbolic link.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) adapter_arguments: Option<BTreeMap<String, String>>,
 }

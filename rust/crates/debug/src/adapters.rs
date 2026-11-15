@@ -103,8 +103,12 @@ const ADAPTER_ARGUMENT_FACTS: &[&str] =
 const MAX_ADAPTER_ARGUMENTS: usize = 8;
 
 /// Arguments that have a typed binding of their own, so `adapterArguments`
-/// may not name them.
-const FIXED_BINDINGS: &[&str] = &["program", "processId", "cwd", "args", "env"];
+/// may not start at them.
+const FIXED_BINDINGS: &[&str] = &["program", "processId", "cwd", "args", ENVIRONMENT_BINDING];
+
+/// The fixed binding that holds an object of environment variables, the only
+/// one an `adapterArguments` path may reach into, to add one variable.
+const ENVIRONMENT_BINDING: &str = "env";
 
 /// The target kind of a remote `host:port` the debuggee listens on.
 const TARGET_CONNECTION: &str = "connection";

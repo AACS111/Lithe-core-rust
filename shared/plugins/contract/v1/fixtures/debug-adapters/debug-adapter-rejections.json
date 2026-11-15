@@ -220,9 +220,9 @@
       "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments"}
     },
     {
-      "id": "adapter-argument-dotted-name",
+      "id": "adapter-argument-path-too-deep",
       "layer": "coreManifest",
-      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"dlv.cwd": "target.directory"}}}}}],
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"a.b.c.d.e": "target.directory"}}}}}],
       "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments"}
     },
     {
@@ -230,6 +230,36 @@
       "layer": "coreManifest",
       "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"cwd": "target.directory"}}}}}],
       "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.cwd"}
+    },
+    {
+      "id": "adapter-argument-replaces-the-environment",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"env": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.env"}
+    },
+    {
+      "id": "adapter-argument-inside-a-fixed-binding",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"program.dir": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.program.dir"}
+    },
+    {
+      "id": "adapter-argument-two-levels-inside-the-environment",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"env.PWD.dir": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.env.PWD.dir"}
+    },
+    {
+      "id": "adapter-arguments-overlap-each-other",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"dlv": "target.path", "dlv.cwd": "target.directory"}}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.dlv.cwd"}
+    },
+    {
+      "id": "adapter-argument-under-a-default-that-is-no-object",
+      "layer": "coreManifest",
+      "edits": [{"op": "set", "path": "/block/debugAdapters/0/configurations", "value": {"launch": {"targetBindings": {"adapterArguments": {"env.PWD": "target.directory"}}, "arguments": {"env": "PWD"}}}}],
+      "expected": {"code": "plugin.manifest.invalid", "field": "debugAdapters[0].configurations.launch.targetBindings.adapterArguments.env.PWD"}
     },
     {
       "id": "adapter-argument-no-debug",

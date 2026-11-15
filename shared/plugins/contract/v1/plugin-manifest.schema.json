@@ -707,11 +707,11 @@
               "$ref": "#/$defs/debugConnectionBinding"
             },
             "adapterArguments": {
-              "description": "Top-level DAP arguments only this adapter defines, each filled from a path fact of the target when the request's `arguments` leave it out, for example Delve's `dlvCwd`, where it builds the program. A name may not be `program`, `processId`, `cwd`, `args` or `env` (they have their own bindings), `noDebug` or start with `__` (the host's), a key of the configuration's own `arguments`, or overlap a `connection` destination.",
+              "description": "DAP arguments only this adapter defines, each filled from a path fact of the target when the request's `arguments` leave it out, for example Delve's `dlvCwd`, where it builds the program. A key is an argument path like a `connection` destination; `env.<variable>` adds one variable to the environment, such as `env.PWD`, which Go reads as the build directory. A path may not start at `program`, `processId`, `cwd`, `args` or `env` itself (they have their own bindings), at `noDebug` or a `__` name (the host's), overlap another path or a `connection` destination, or land on or under a value the configuration's own `arguments` set.",
               "type": "object",
               "minProperties": 1,
               "maxProperties": 8,
-              "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$" },
+              "propertyNames": { "$ref": "#/$defs/debugArgumentPath" },
               "additionalProperties": {
                 "description": "`target.path` is the target's own path, `target.directory` the directory containing it, `target.workingDirectory` the working directory.",
                 "enum": ["target.path", "target.directory", "target.workingDirectory"]
