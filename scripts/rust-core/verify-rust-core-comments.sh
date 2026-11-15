@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Usage: verify-rust-core-comments.sh [crate-directory ...]
+#
+# The textual checks always cover every crate. Rustdoc builds each crate, so
+# CI passes the directories under rust/crates of the crates a change can
+# affect; without arguments every crate is built.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +19,17 @@ SOURCE_DIRS=()
 for manifest in "${crate_manifests[@]}"; do
     SOURCE_DIRS+=("$ROOT_DIR/${manifest%Cargo.toml}src")
 done
+rustdoc_manifests=("${crate_manifests[@]}")
+if (( $# > 0 )); then
+    rustdoc_manifests=()
+    for directory in "$@"; do
+        if [[ ! -f "rust/crates/$directory/Cargo.toml" ]]; then
+            printf '%s\n' "rust/crates/$directory is not a Rust Core crate" >&2
+            exit 2
+        fi
+        rustdoc_manifests+=("rust/crates/$directory/Cargo.toml")
+    done
+fi
 
 rust_files=()
 production_files=()
@@ -110,7 +126,7 @@ fi
 # Let Rust understand visibility instead of treating pub items in private
 # modules as exported APIs. This covers public functions, types, variants, and
 # fields without requiring documentation for every internal helper.
-for manifest in "${crate_manifests[@]}"; do
+for manifest in "${rustdoc_manifests[@]}"; do
     cargo rustdoc --quiet \
         --manifest-path "$manifest" \
         --lib -- \
