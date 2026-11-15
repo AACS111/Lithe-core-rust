@@ -152,7 +152,9 @@ pub struct DebugTargetBindings {
     /// Source of the `processId` argument: only `target.processID`. Attach only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub process_id: Option<String>,
-    /// Source of the `cwd` argument: only `target.workingDirectory`.
+    /// Source of the `cwd` argument: `target.workingDirectory`, or
+    /// `target.directory` (the directory containing `target.path`) for an
+    /// adapter whose program runs where its package is, such as Delve.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
     /// Where a remote `host:port` goes. Attach only.

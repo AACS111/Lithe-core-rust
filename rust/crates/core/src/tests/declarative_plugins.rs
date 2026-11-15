@@ -2181,10 +2181,12 @@ fn debug_start_arguments_fill_adapter_arguments_from_path_facts() {
         ("/work", "/work/cmd/app/main.go", "/work/cmd/app")
     };
     // Delve's shape: it builds in `dlvCwd`, not in its own working directory,
-    // and runs the program there when `cwd` is left out.
+    // and runs the program in `cwd`, which the debug engine sets to the
+    // workspace root when nothing binds it.
     let mut manifest = fixture("debug-adapter.plugin.json");
     manifest["debugAdapters"][0]["configurations"]["launch"]["targetBindings"] = json!({
         "program": "target.directory",
+        "cwd": "target.directory",
         "adapterArguments": {
             "dlvCwd": "target.directory",
             "file": "target.path",
@@ -2210,6 +2212,7 @@ fn debug_start_arguments_fill_adapter_arguments_from_path_facts() {
         json!({
             "stopOnEntry": false,
             "program": directory,
+            "cwd": directory,
             "dlvCwd": directory,
             "file": path,
             "root": root,
@@ -2227,6 +2230,61 @@ fn debug_start_arguments_fill_adapter_arguments_from_path_facts() {
         refused["error"]["field"], "target.workingDirectory",
         "{refused}"
     );
+}
+
+#[test]
+fn debug_start_arguments_bind_cwd_to_the_directory_of_the_target() {
+    let (root, path, directory) = if cfg!(windows) {
+        (r"C:\work", r"C:\work\lab\main.go", r"C:\work\lab")
+    } else {
+        ("/work", "/work/lab/main.go", "/work/lab")
+    };
+    let start = |cwd: &str, target: Value| {
+        let mut manifest = fixture("debug-adapter.plugin.json");
+        manifest["debugAdapters"][0]["configurations"]["launch"]["targetBindings"] =
+            json!({ "cwd": cwd });
+        lithe_plugin_manifest::debug_start_arguments_command(json!({
+            "manifest": manifest,
+            "adapterID": "example",
+            "request": "launch",
+            "facts": {
+                "registration": { "generation": 3, "currentGeneration": 3 },
+                "target": target,
+            },
+        }))
+        .expect("payload is well formed")
+    };
+    let target = json!({ "kind": "file", "path": path, "workingDirectory": root });
+    for (cwd, expected) in [
+        ("target.directory", directory),
+        ("target.workingDirectory", root),
+    ] {
+        let launch = start(cwd, target.clone());
+        assert_eq!(launch["status"], "ok", "{launch}");
+        assert_eq!(launch["arguments"]["cwd"], expected, "{cwd}: {launch}");
+    }
+
+    // A bare file name has no directory to run in, and a target without a
+    // working directory has none either; both are refused before the start.
+    for (cwd, target, field) in [
+        (
+            "target.directory",
+            json!({ "kind": "file", "path": "main.go", "workingDirectory": root }),
+            "target.path",
+        ),
+        (
+            "target.workingDirectory",
+            json!({ "kind": "file", "path": path }),
+            "target.workingDirectory",
+        ),
+    ] {
+        let refused = start(cwd, target);
+        assert_eq!(
+            refused["error"]["code"], "debug.target.invalid",
+            "{refused}"
+        );
+        assert_eq!(refused["error"]["field"], field, "{refused}");
+    }
 }
 
 #[test]
