@@ -109,14 +109,11 @@ fn create_line_history_scratch() -> Result<ScopedLineHistoryDirectory, CoreError
             .unwrap_or_default()
             + attempt;
         let candidate = std::env::temp_dir().join(format!("{prefix}-{stamp}"));
-        let builder = std::fs::DirBuilder::new();
-        #[cfg(unix)]
-        let builder = {
-            use std::os::unix::fs::DirBuilderExt;
-            let mut builder = builder;
-            builder.mode(0o700);
-            builder
-        };
+        let mut builder = std::fs::DirBuilder::new();
+        lithe_platform::fs::directory_mode(
+            &mut builder,
+            lithe_platform::fs::OWNER_ONLY_DIRECTORY_MODE,
+        );
         match builder.create(&candidate) {
             Ok(()) => return Ok(ScopedLineHistoryDirectory(candidate)),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {

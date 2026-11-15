@@ -976,6 +976,7 @@ name = "lithe-diagnostics"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "lithe-platform",
  "lithe-protocol",
  "regex",
  "serde",
@@ -1053,6 +1054,7 @@ dependencies = [
  "lithe-diff",
  "lithe-git-host",
  "lithe-github",
+ "lithe-platform",
  "lithe-protocol",
  "lithe-remote",
  "lithe-request-context",
@@ -1069,6 +1071,7 @@ name = "lithe-git-host"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "lithe-platform",
  "rand",
  "serde",
  "serde_json",
@@ -1090,6 +1093,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "fs2",
+ "lithe-platform",
  "reqwest",
  "rmcp",
  "serde",
@@ -1159,6 +1163,7 @@ version = "0.1.0"
 dependencies = [
  "lithe-diagnostics",
  "lithe-git-host",
+ "lithe-platform",
  "lithe-protocol",
  "lithe-remote",
  "lithe-workspace",
@@ -1172,6 +1177,19 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "lithe-platform"
+version = "0.1.0"
+
+[[package]]
+name = "lithe-platform-tests"
+version = "0.1.0"
+dependencies = [
+ "lithe-git-host",
+ "lithe-lsp-transport",
+ "lithe-platform",
 ]
 
 [[package]]
@@ -1383,6 +1401,7 @@ dependencies = [
  "lithe-core-rules",
  "lithe-diagnostics",
  "lithe-git",
+ "lithe-platform",
  "lithe-protocol",
  "lithe-request-context",
  "lithe-text",
@@ -1398,6 +1417,7 @@ dependencies = [
 name = "lithe-project-generators"
 version = "0.1.0"
 dependencies = [
+ "lithe-platform",
  "lithe-plugin-model",
  "lithe-protocol",
  "rand",
@@ -1503,6 +1523,7 @@ version = "0.1.0"
 dependencies = [
  "lithe-diagnostics",
  "lithe-git-host",
+ "lithe-platform",
  "lithe-protocol",
  "lithe-remote",
  "lithe-request-context",

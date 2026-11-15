@@ -2,6 +2,8 @@
 //! `.git` resolution, and the pathspec checks every command applies.
 
 use super::*;
+use lithe_platform::names::is_reserved_device_name;
+use lithe_platform::Platform;
 
 /// Discovers Git repositories for an opened workspace using shared traversal rules.
 pub fn workspace_repositories(
@@ -110,8 +112,14 @@ fn repository_scan_directory_is_visible(name: &str) -> bool {
 /// Rejects Windows names that cannot round-trip through ordinary path identifiers.
 /// POSIX names keep their native meaning; Windows validates relative paths too.
 pub(crate) fn validate_windows_git_path(path: &Path) -> std::io::Result<()> {
+    validate_git_path_on(path, Platform::HOST)
+}
+
+/// [`validate_windows_git_path`] for a repository that `platform` opens. A
+/// drive or UNC path is checked on every platform.
+fn validate_git_path_on(path: &Path, platform: Platform) -> std::io::Result<()> {
     let text = path.to_string_lossy().replace('\\', "/");
-    let windows_path = cfg!(windows)
+    let windows_path = platform.is_windows()
         || text.starts_with("//")
         || (text.as_bytes().get(1) == Some(&b':') && text.as_bytes()[0].is_ascii_alphabetic());
     if !windows_path {
@@ -148,22 +156,7 @@ pub(crate) fn validate_windows_git_path(path: &Path) -> std::io::Result<()> {
         if matches!(*part, "." | "..") {
             return verbatim.is_some();
         }
-        let basename = part
-            .split('.')
-            .next()
-            .unwrap_or_default()
-            .to_ascii_uppercase();
-        let reserved = matches!(basename.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-            || basename
-                .strip_prefix("COM")
-                .or_else(|| basename.strip_prefix("LPT"))
-                .is_some_and(|number| {
-                    matches!(
-                        number,
-                        "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
-                    )
-                });
-        part.ends_with('.') || part.ends_with(' ') || reserved
+        part.ends_with('.') || part.ends_with(' ') || is_reserved_device_name(part)
     });
     if text.starts_with("//./")
         || (verbatim.is_some() && !drive && !(network && components.len() >= 2))
@@ -409,14 +402,7 @@ pub(crate) fn is_safe_pathspec(path: &str) -> bool {
 }
 
 pub(crate) fn null_device() -> &'static str {
-    #[cfg(windows)]
-    {
-        "NUL"
-    }
-    #[cfg(not(windows))]
-    {
-        "/dev/null"
-    }
+    Platform::HOST.null_device()
 }
 
 pub(crate) fn relative_or_absolute(path: &Path, root: &Path) -> String {
@@ -430,4 +416,54 @@ pub(crate) fn relative_or_absolute(path: &Path, root: &Path) -> String {
             }
         })
         .unwrap_or_else(|_| path.to_string_lossy().replace('\\', "/"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_git_path_on;
+    use lithe_platform::Platform;
+    use std::path::Path;
+
+    #[test]
+    fn windows_rejects_relative_names_it_would_store_differently() {
+        for path in [
+            "src/CON.txt",
+            "src/conin$",
+            "src/COM1",
+            "src/name.",
+            "src/name ",
+            "C:/repo/AUX",
+        ] {
+            assert!(
+                validate_git_path_on(Path::new(path), Platform::Windows).is_err(),
+                "{path}"
+            );
+        }
+        for path in [
+            "src/App.java",
+            "C:/repo/src/console.txt",
+            "//server/share/repo",
+        ] {
+            assert!(
+                validate_git_path_on(Path::new(path), Platform::Windows).is_ok(),
+                "{path}"
+            );
+        }
+    }
+
+    #[test]
+    fn unix_keeps_posix_names_but_still_checks_windows_paths() {
+        for path in ["src/CON.txt", "src/name.", "/repo/AUX"] {
+            assert!(
+                validate_git_path_on(Path::new(path), Platform::Unix).is_ok(),
+                "{path}"
+            );
+        }
+        for path in ["C:/repo/AUX", "//./pipe/repo"] {
+            assert!(
+                validate_git_path_on(Path::new(path), Platform::Unix).is_err(),
+                "{path}"
+            );
+        }
+    }
 }

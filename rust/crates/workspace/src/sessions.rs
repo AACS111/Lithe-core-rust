@@ -129,15 +129,12 @@ impl Connection {
         }
         match &self.transport {
             ConnectionTransport::Ssh { child, tree } => {
-                // Grace expiry is advisory: the checked kill and wait below own the result.
-                if let Err(error) = tree.terminate(EXIT_GRACE) {
-                    if error.kind() != std::io::ErrorKind::TimedOut {
-                        record_cleanup_io("tree-terminate", &error);
-                    }
-                }
                 let mut child = child
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner());
+                if let Err(error) = tree.kill() {
+                    record_cleanup_io("tree-kill", &error);
+                }
                 if let Err(error) = child.kill() {
                     // Killing an already exited child is an expected missing process.
                     if !matches!(child.try_wait(), Ok(Some(_))) {
@@ -146,6 +143,12 @@ impl Connection {
                 }
                 if let Err(error) = child.wait() {
                     record_cleanup_io("wait", &error);
+                }
+                // A Unix process group counts an unreaped root as alive, so the
+                // tree is awaited only after the wait above; what remains are
+                // descendants that may outlive the session.
+                if let Err(error) = tree.terminate(EXIT_GRACE) {
+                    record_cleanup_io("tree-terminate", &error);
                 }
             }
             #[cfg(any(test, feature = "test-support"))]

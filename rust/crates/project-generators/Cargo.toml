@@ -6,6 +6,7 @@ license = "Apache-2.0"
 description = "Project generators declared by Lithe plugins: declarations, the New Project form, generation plans and archive extraction"
 
 [dependencies]
+lithe-platform = { path = "../platform" }
 lithe-plugin-model = { path = "../plugin-model" }
 lithe-protocol = { path = "../protocol" }
 regex = "1.11"

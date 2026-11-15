@@ -5,6 +5,9 @@
 //! existing files are never replaced, and the bytes actually written are
 //! bounded regardless of what the headers claim.
 
+use lithe_platform::fs::{add_execute_bits, mode_is_executable};
+use lithe_platform::names::is_portable_windows_component;
+use lithe_platform::Platform;
 use lithe_plugin_model::{PluginRejection, Validation};
 use lithe_protocol::CoreError;
 use std::collections::HashSet;
@@ -150,7 +153,7 @@ fn relative_entry(entry: &zip::read::ZipFile<'_>) -> Validation<PathBuf> {
     }
     entry
         .enclosed_name()
-        .filter(|path| is_plain_relative(path))
+        .filter(|path| is_plain_relative(path, Platform::HOST))
         .ok_or_else(|| {
             PluginRejection::at(
                 ARCHIVE_INVALID,
@@ -213,12 +216,14 @@ fn validate_entries(
     Ok(())
 }
 
-fn is_plain_relative(path: &Path) -> bool {
+/// Whether `path` is a relative path of ordinary names that `platform`
+/// stores exactly as written.
+fn is_plain_relative(path: &Path, platform: Platform) -> bool {
     let components: Vec<_> = path.components().collect();
     !components.is_empty()
         && components.len() <= MAX_DEPTH
         && components.iter().all(|component| match component {
-            Component::Normal(value) => safe_component(value),
+            Component::Normal(value) => safe_component(value, platform),
             _ => false,
         })
 }
@@ -237,33 +242,10 @@ fn real_directory(metadata: &fs::Metadata) -> bool {
     true
 }
 
-#[cfg(windows)]
-fn safe_component(value: &std::ffi::OsStr) -> bool {
-    let Some(value) = value.to_str() else {
-        return false;
-    };
-    let base = value.split('.').next().unwrap_or("").to_ascii_uppercase();
-    !value.ends_with(['.', ' '])
-        && !value
-            .chars()
-            .any(|ch| ch.is_control() || "<>:\"|?*".contains(ch))
-        && !matches!(
-            base.as_str(),
-            "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
-        )
-        && !["COM", "LPT"].iter().any(|prefix| {
-            base.strip_prefix(prefix).is_some_and(|n| {
-                matches!(
-                    n,
-                    "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
-                )
-            })
-        })
-}
-
-#[cfg(not(windows))]
-fn safe_component(_: &std::ffi::OsStr) -> bool {
-    true
+/// Unix stores any name the earlier checks let through. Windows needs valid
+/// Unicode and rejects names it would store differently or open as a device.
+fn safe_component(value: &std::ffi::OsStr, platform: Platform) -> bool {
+    !platform.is_windows() || value.to_str().is_some_and(is_portable_windows_component)
 }
 
 /// Creates each directory below `root` along `relative`, refusing to walk
@@ -287,19 +269,10 @@ fn ensure_directories(root: &Path, relative: &Path) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(unix)]
 fn set_executable(path: &Path, mode: Option<u32>) -> io::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    if mode.is_some_and(|mode| mode & 0o111 != 0) {
-        let mut permissions = fs::metadata(path)?.permissions();
-        permissions.set_mode(permissions.mode() | 0o111);
-        fs::set_permissions(path, permissions)?;
+    if mode.is_some_and(mode_is_executable) {
+        add_execute_bits(path)?;
     }
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn set_executable(_: &Path, _: Option<u32>) -> io::Result<()> {
     Ok(())
 }
 
@@ -570,7 +543,6 @@ mod tests {
         );
     }
 
-    #[cfg(windows)]
     #[test]
     fn windows_archive_paths_reject_ads_device_names_and_verbatim_normalization() {
         for name in [
@@ -580,11 +552,11 @@ mod tests {
             "trailing.",
             "space ",
         ] {
-            let (directory, path) = archive(&[(name, b"no", None)]);
-            let destination = directory.path().join("project");
-            fs::create_dir(&destination).unwrap();
-            assert!(extract(&path, &destination).is_err(), "{name}");
-            assert_eq!(fs::read_dir(destination).unwrap().count(), 0);
+            assert!(
+                !is_plain_relative(Path::new(name), Platform::Windows),
+                "{name}"
+            );
+            assert!(is_plain_relative(Path::new(name), Platform::Unix), "{name}");
         }
     }
 

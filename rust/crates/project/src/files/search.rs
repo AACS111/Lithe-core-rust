@@ -1,6 +1,8 @@
 //! Text search, with and without the search index.
 
 use super::*;
+use lithe_platform::paths::relative_path_contains;
+use lithe_platform::Platform;
 
 /// Applies workspace matching to provider snapshots in one bounded request.
 pub fn search_text_batch(request: SearchTextBatchRequest) -> Result<serde_json::Value, CoreError> {
@@ -87,16 +89,9 @@ pub fn search(request: SearchRequest) -> Result<SearchResponse, CoreError> {
 
 pub(crate) fn scope_allows(scopes: &[String], path: &str) -> bool {
     scopes.is_empty()
-        || scopes.iter().any(|scope| {
-            #[cfg(windows)]
-            let (scope, path) = (scope.to_lowercase(), path.to_lowercase());
-            scope.is_empty()
-                || scope == "."
-                || path == scope.as_str()
-                || path
-                    .strip_prefix(scope.as_str())
-                    .is_some_and(|suffix| suffix.starts_with('/'))
-        })
+        || scopes
+            .iter()
+            .any(|scope| scope.is_empty() || relative_path_contains(scope, path, Platform::HOST))
 }
 
 pub(crate) fn search_with_index(

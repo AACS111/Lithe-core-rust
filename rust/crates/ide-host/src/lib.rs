@@ -153,12 +153,7 @@ fn private_file(path: &std::path::Path, truncate: bool) -> std::io::Result<File>
         .write(true)
         .read(true)
         .truncate(truncate);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    options.open(path)
+    lithe_platform::fs::owner_only_file(&mut options).open(path)
 }
 
 #[derive(Deserialize)]
@@ -190,12 +185,7 @@ fn open(args: Value) -> Result<Value, String> {
         return Err("The packaged lithe-mcp helper is missing. Reinstall or rebuild Lithe.".into());
     }
     std::fs::create_dir_all(&args.directory).map_err(|e| e.to_string())?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&args.directory, std::fs::Permissions::from_mode(0o700))
-            .map_err(|e| e.to_string())?;
-    }
+    lithe_platform::fs::restrict_directory_to_owner(&args.directory).map_err(|e| e.to_string())?;
     let key = format!("{:x}", Sha256::digest(args.workspace_key.as_bytes()));
     let lock = private_file(&args.directory.join(format!("{key}.lock")), false)
         .map_err(|e| e.to_string())?;

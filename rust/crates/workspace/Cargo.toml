@@ -12,6 +12,7 @@ test-support = []
 [dependencies]
 lithe-diagnostics = { path = "../diagnostics" }
 lithe-git-host = { path = "../git-host" }
+lithe-platform = { path = "../platform" }
 lithe-protocol = { path = "../protocol" }
 lithe-remote = { path = "../remote", default-features = false, features = ["client"] }
 lithe-request-context = { path = "../request-context" }

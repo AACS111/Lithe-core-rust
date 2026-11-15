@@ -679,9 +679,10 @@ fn environment(root: &str, record: &SessionRecord) -> Result<Vec<(String, String
             .map_err(|_| invalid("Git rebase session paths must support UTF-8"))?;
         // Git for Windows runs editors with its MSYS shell, whose utilities
         // consume slash-separated drive paths reliably through environment vars.
-        #[cfg(windows)]
-        let path = path.replace('\\', "/");
-        Ok::<_, CoreError>(path)
+        Ok::<_, CoreError>(
+            lithe_platform::paths::slash_separated(&path, lithe_platform::Platform::HOST)
+                .into_owned(),
+        )
     };
     Ok(vec![
         ("GIT_SEQUENCE_EDITOR".into(), SEQUENCE_EDITOR.into()),

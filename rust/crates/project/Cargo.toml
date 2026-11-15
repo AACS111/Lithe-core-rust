@@ -17,6 +17,7 @@ encoding_rs = "0.8"
 lithe-core-rules = { path = "../core-rules" }
 lithe-diagnostics = { path = "../diagnostics" }
 lithe-git = { path = "../git" }
+lithe-platform = { path = "../platform" }
 lithe-protocol = { path = "../protocol" }
 lithe-request-context = { path = "../request-context" }
 lithe-text = { path = "../text" }

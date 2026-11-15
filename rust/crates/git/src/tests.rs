@@ -416,12 +416,6 @@ fn create_tag_arguments_follow_the_lightweight_and_signature_matrix() {
     }
 }
 
-#[cfg(target_os = "windows")]
-#[test]
-fn background_git_processes_do_not_create_windows_console() {
-    assert_eq!(super::git_process_creation_flags(), 0x08000000);
-}
-
 // A Latin-1 `é` (0xE9) decodes to U+FFFD; writing that patch back would
 // replace the original byte with EF BF BD, so the response must say so.
 #[test]

@@ -1,60 +1,42 @@
 //! Native executable resolution and per-child Git environment configuration.
+use lithe_platform::fs::is_launchable_file;
+use lithe_platform::paths::slash_separated;
+use lithe_platform::Platform;
 use std::path::PathBuf;
 use std::process::Command;
 
 /// Resolves a user-selected executable or the first runnable Git on PATH.
 pub fn executable(selected: Option<&str>) -> Option<PathBuf> {
+    let platform = Platform::HOST;
     let candidates = match selected {
         Some(path) => vec![PathBuf::from(path)],
-        None => std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
-            .flat_map(|directory| {
-                #[cfg(windows)]
-                let names = ["git.exe"];
-                #[cfg(not(windows))]
-                let names = ["git"];
-                names.map(|name| directory.join(name))
-            })
-            .collect(),
+        None => {
+            let name = platform.executable_name("git");
+            std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+                .map(|directory| directory.join(&name))
+                .collect()
+        }
     };
     candidates
         .into_iter()
         .find(|path| {
-            let Ok(metadata) = path.metadata() else {
-                return false;
-            };
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                metadata.is_file() && metadata.permissions().mode() & 0o111 != 0
-            }
-            #[cfg(not(unix))]
-            {
-                metadata.is_file()
-            }
+            path.metadata()
+                .is_ok_and(|metadata| is_launchable_file(&metadata))
         })
-        .map(launch_path)
+        .map(|path| launch_path(path, platform))
 }
 
 /// Some Windows hosts (disk-encryption or endpoint-security filters) make a Git started through a
 /// backslash path print nothing to a captured pipe, while the same executable started through a
 /// forward-slash path behaves normally. Windows accepts both separators, so launch with `/`.
-fn launch_path(path: PathBuf) -> PathBuf {
-    #[cfg(windows)]
-    {
-        if let Some(text) = path.to_str() {
-            return PathBuf::from(forward_slash_path(text));
+/// Verbatim (`\\?\`) and UNC (`\\server`) paths keep their native form because `/` is not valid
+/// there.
+fn launch_path(path: PathBuf, platform: Platform) -> PathBuf {
+    match path.to_str() {
+        Some(text) if !text.starts_with(r"\\") => {
+            PathBuf::from(slash_separated(text, platform).into_owned())
         }
-    }
-    path
-}
-
-/// Verbatim (`\\?\`) and UNC (`\\server`) paths keep their native form because `/` is not valid there.
-#[cfg(any(windows, test))]
-fn forward_slash_path(path: &str) -> String {
-    if path.starts_with(r"\\") {
-        path.to_owned()
-    } else {
-        path.replace('\\', "/")
+        _ => path,
     }
 }
 
@@ -158,34 +140,24 @@ mod tests {
     }
 
     #[test]
-    fn launch_paths_use_forward_slashes_except_unc_and_verbatim() {
+    fn windows_launch_paths_use_forward_slashes_except_unc_and_verbatim() {
+        let launch = |path: &str| launch_path(PathBuf::from(path), Platform::Windows);
         assert_eq!(
-            forward_slash_path(r"D:\Program Files\Git\cmd\git.exe"),
-            "D:/Program Files/Git/cmd/git.exe"
+            launch(r"D:\Program Files\Git\cmd\git.exe"),
+            PathBuf::from("D:/Program Files/Git/cmd/git.exe")
         );
         assert_eq!(
-            forward_slash_path("D:/Git/cmd/git.exe"),
-            "D:/Git/cmd/git.exe"
+            launch("D:/Git/cmd/git.exe"),
+            PathBuf::from("D:/Git/cmd/git.exe")
         );
         for native in [r"\\server\share\git.exe", r"\\?\D:\Git\cmd\git.exe"] {
-            assert_eq!(forward_slash_path(native), native);
+            assert_eq!(launch(native), PathBuf::from(native));
         }
     }
 
-    // Regression: a backslash launch path makes some Windows hosts capture empty Git output, so the
-    // resolved executable must reach the process spawner with forward slashes.
-    #[cfg(windows)]
     #[test]
-    fn selected_executable_is_resolved_with_forward_slashes() {
-        let file = std::env::temp_dir().join(format!(
-            "lithe-git-host-launch-path-{}.exe",
-            std::process::id()
-        ));
-        std::fs::write(&file, b"").unwrap();
-        let resolved = executable(file.to_str());
-        std::fs::remove_file(&file).unwrap();
-        let resolved = resolved.unwrap().to_string_lossy().into_owned();
-        assert!(!resolved.contains('\\'), "{resolved}");
-        assert!(resolved.ends_with(".exe"), "{resolved}");
+    fn unix_launch_paths_keep_backslashes_as_name_characters() {
+        let path = PathBuf::from(r"/opt/odd\name/git");
+        assert_eq!(launch_path(path.clone(), Platform::Unix), path);
     }
 }

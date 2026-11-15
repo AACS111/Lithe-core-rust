@@ -131,12 +131,7 @@ pub fn validate_segment(value: &str) -> Result<(), LogError> {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || b"._-".contains(&c));
     // Win32 strips trailing dots and reserves device basenames even with an extension.
     // Reject them on every host so the same identity always names the same file.
-    let basename = value.split('.').next().unwrap_or("");
-    let device = matches!(basename, "con" | "prn" | "aux" | "nul")
-        || (basename.len() == 4
-            && (basename.starts_with("com") || basename.starts_with("lpt"))
-            && matches!(basename.as_bytes()[3], b'1'..=b'9'));
-    if !valid || value.ends_with('.') || device {
+    if !valid || !lithe_platform::names::is_portable_windows_component(value) {
         return Err(LogError::new(-32033, "Invalid channel segment"));
     }
     Ok(())

@@ -11,6 +11,7 @@ description = "Structured log catalog, channels, records, queries and the bounde
 test-support = []
 
 [dependencies]
+lithe-platform = { path = "../platform" }
 lithe-protocol = { path = "../protocol" }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 regex = "1.11"

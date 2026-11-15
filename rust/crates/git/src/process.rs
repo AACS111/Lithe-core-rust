@@ -466,25 +466,11 @@ pub(crate) fn git_process() -> Command {
     let options = execution_policy::current();
     let executable = lithe_git_host::configuration::executable(options.executable.as_deref())
         .unwrap_or_else(|| options.executable.unwrap_or_else(|| "git".into()).into());
-    #[cfg(target_os = "windows")]
-    {
-        let mut process = Command::new(executable);
-        process.creation_flags(git_process_creation_flags());
-        process
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Command::new(executable)
-    }
-}
-
-#[cfg(target_os = "windows")]
-pub(crate) fn git_process_creation_flags() -> u32 {
     // Git runs as an IDE background task; attaching a console can briefly open
     // the user's default terminal whenever status or repository data refreshes.
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-    CREATE_NO_WINDOW
+    let mut process = Command::new(executable);
+    lithe_platform::process::hide_console_window(&mut process);
+    process
 }
 
 pub(crate) fn successful_git_result() -> GitCommandResponse {
@@ -563,18 +549,8 @@ pub(crate) fn run_git(
             &[],
             false,
         )?;
-        #[cfg(unix)]
-        let status = {
-            use std::os::unix::process::ExitStatusExt;
-            std::process::ExitStatus::from_raw(output.exit_code << 8)
-        };
-        #[cfg(windows)]
-        let status = {
-            use std::os::windows::process::ExitStatusExt;
-            std::process::ExitStatus::from_raw(output.exit_code as u32)
-        };
         return Ok(std::process::Output {
-            status,
+            status: lithe_platform::process::exit_status_from_code(output.exit_code),
             stdout: output.stdout,
             stderr: output.stderr,
         });

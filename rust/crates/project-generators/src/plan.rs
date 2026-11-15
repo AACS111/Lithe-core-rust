@@ -336,7 +336,7 @@ fn template_files(
         files.push(json!({
             "path": path,
             "contents": contents,
-            "executable": is_executable(&metadata),
+            "executable": lithe_platform::fs::has_execute_bit(&metadata),
         }));
     }
     Ok(files)
@@ -377,15 +377,4 @@ fn collect_files(
         }
     }
     Ok(())
-}
-
-#[cfg(unix)]
-fn is_executable(metadata: &fs::Metadata) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    metadata.permissions().mode() & 0o111 != 0
-}
-
-#[cfg(not(unix))]
-fn is_executable(_: &fs::Metadata) -> bool {
-    false
 }
