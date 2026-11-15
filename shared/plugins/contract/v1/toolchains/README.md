@@ -37,6 +37,15 @@ fields fail closed. Candidate graph ordering reuses the existing shared graph
 validator and cannot cross layer barriers. This slice does not support a
 definition candidate of `kind: runtime`, or `toolchainConsumers`.
 
+`version` is `{arguments, pattern}`. `arguments` lists one to eight distinct
+literal words of at most 64 bytes. The first is a flag (`-version`,
+`--version`) or a subcommand (`version`, for a tool such as Go that prints its
+version only that way); every later one is a flag. A flag or subcommand is an
+ASCII letter followed by letters, digits and `-`; flags carry no `=value`.
+A bare word after the first is refused, so a probe never passes the tool an
+operand such as a script or a file. `pattern` is a bounded Rust regular
+expression whose first capture is the dotted numeric version.
+
 Provider entries contain `{id, displayName, tools, watchFiles?}`; each watch entry
 is `{pattern, reader: "native" | "compatible"}`. A present `watchFiles` lists 1-32
 unique patterns; an absent one makes an installation-only provider, whose

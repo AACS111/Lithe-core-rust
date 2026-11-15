@@ -187,6 +187,39 @@ fn definition_nested_objects_fail_closed_and_enforce_safe_exports() {
     }
 }
 
+// A tool that prints its version only for a subcommand, such as `go version`,
+// is probed with that subcommand first; every later argument stays a flag, so a
+// probe cannot hand the tool an operand to run.
+#[test]
+fn a_version_probe_may_lead_with_a_subcommand_followed_only_by_flags() {
+    let plugin = "dev.lithe.fixture.compiler";
+    let base = definition(&format!("{plugin}:compiler"));
+    for (arguments, accepted) in [
+        (json!(["version"]), true),
+        (json!(["version", "--json"]), true),
+        (json!(["-version"]), true),
+        (json!(["--version", "-v"]), true),
+        (json!(["version", "script"]), false),
+        (json!(["--version", "run"]), false),
+        (json!(["-c", "script"]), false),
+        (json!(["./version"]), false),
+        (json!(["version=1"]), false),
+    ] {
+        let mut changed = base.clone();
+        changed["version"]["arguments"] = arguments.clone();
+        assert_eq!(
+            validate_declarations(plugin, &[changed.clone()], &[]).is_ok(),
+            accepted,
+            "{arguments}"
+        );
+        assert_eq!(
+            validate_manifest_value(manifest(plugin, changed)).is_ok(),
+            accepted,
+            "{arguments}"
+        );
+    }
+}
+
 #[test]
 fn definition_metadata_cannot_disagree_with_executable_plan_or_cross_layers() {
     let base = definition("dev.lithe.fixture.compiler:compiler");

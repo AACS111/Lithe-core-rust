@@ -3398,9 +3398,18 @@
       ],
       "properties": {
         "arguments": {
+          "description": "The first argument is a flag or a subcommand such as `version`; every later argument is a flag.",
           "type": "array",
           "minItems": 1,
           "maxItems": 8,
+          "uniqueItems": true,
+          "prefixItems": [
+            {
+              "type": "string",
+              "pattern": "^(--?)?[A-Za-z][A-Za-z0-9-]*$",
+              "maxLength": 64
+            }
+          ],
           "items": {
             "type": "string",
             "pattern": "^--?[A-Za-z][A-Za-z0-9-]*$",
