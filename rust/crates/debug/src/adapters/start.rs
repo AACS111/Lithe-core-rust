@@ -167,7 +167,11 @@ fn bound_arguments(
     bind(
         "cwd",
         &bindings.cwd,
-        target.working_directory.clone().map(Value::from),
+        bindings
+            .cwd
+            .as_deref()
+            .and_then(|fact| path_fact(target, fact))
+            .map(Value::from),
     );
     bind(
         "args",
@@ -205,8 +209,8 @@ pub(crate) fn target_directory(path: &str) -> Option<&str> {
         .filter(|directory| !directory.is_empty())
 }
 
-/// The value of a path fact an `adapterArguments` binding reads, or `None`
-/// when the target does not carry it.
+/// The value of a path fact a `cwd` or `adapterArguments` binding reads, or
+/// `None` when the target does not carry it.
 pub(crate) fn path_fact<'a>(target: &'a TargetFacts, fact: &str) -> Option<&'a str> {
     let present = |value: &'a Option<String>| value.as_deref().filter(|value| !value.is_empty());
     match fact {

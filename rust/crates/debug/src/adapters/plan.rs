@@ -147,15 +147,12 @@ pub fn plan(
     if bindings.process_id.is_some() && target.process_id.is_none() {
         return Err(missing("target.processID", "process ID"));
     }
-    if bindings.cwd.is_some()
-        && target
-            .working_directory
-            .as_deref()
-            .is_none_or(str::is_empty)
+    // `cwd` and the adapter's own arguments all read path facts.
+    for fact in bindings
+        .cwd
+        .iter()
+        .chain(bindings.adapter_arguments.iter().flat_map(BTreeMap::values))
     {
-        return Err(missing("target.workingDirectory", "working directory"));
-    }
-    for fact in bindings.adapter_arguments.iter().flat_map(BTreeMap::values) {
         if path_fact(target, fact).is_some() {
             continue;
         }
