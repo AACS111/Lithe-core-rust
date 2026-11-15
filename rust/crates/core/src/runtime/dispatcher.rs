@@ -458,6 +458,11 @@ fn execute_parsed(mut parsed: CoreRequest, document: Option<&str>) -> CoreRespon
         CoreCommand::WorkbenchChromeLayoutReduce => {
             rules_response(id, "workbench.chromeLayout.reduce", parsed.payload)
         }
+        CoreCommand::WorkbenchNotificationsReduceReadState => rules_response(
+            id,
+            "workbench.notifications.reduceReadState",
+            parsed.payload,
+        ),
         CoreCommand::TerminalParseLinkTarget => {
             let result =
                 serde_json::from_value::<lithe_terminal::ParseLinkTargetsRequest>(parsed.payload)

@@ -599,6 +599,7 @@ or removing a command fails until the table changes in the same commit.
 | `workspace.classifyVisibility` | Classify a batch of workspace-relative paths as hidden or visible. The rule lives in `lithe-core-rules` so the Windows frontend can run it synchronously |
 | `workspace.visibilityDefaults` | Return the built-in hidden-path lists (from `lithe-core-rules`) |
 | `workbench.chromeLayout.reduce` | Apply one transition to the rearrangeable workbench chrome: stripe, title bar and status bar button placement, hidden stripe buttons and open tool panels (from `lithe-core-rules`) |
+| `workbench.notifications.reduceReadState` | Apply one notification arrival or mark a window's history read; return bounded unread identities and the ready-to-render count (from `lithe-core-rules`) |
 | `terminal.parseLinkTarget` | Resolve terminal link candidates into file or external targets |
 | `outputStyle.decode` | Decode one chunk of console output with ANSI escapes into plain lines and styled ranges, carrying the console's state to the next chunk |
 | `debug.createSession` | Create a transport-neutral DAP session and return its initialize frame |
@@ -6414,3 +6415,43 @@ No third-party keymap import or plugin protocol change is introduced. The reduce
 lives in the pure crate `rust/crates/core-rules`.
 
 Executable vectors: `rust/fixtures/editor/ide-essentials-v1.json` (C ABI tests).
+
+## Notification read state
+
+`workbench.notifications.reduceReadState` is a pure synchronous reducer owned by
+`lithe-core-rules`. A native window holds the returned state and submits it with
+its next event. Core retains no global state and performs no I/O. Notification
+text, timestamps, toast handles and display rows remain in the host; only read
+metadata crosses this boundary, and only when a notification or visibility event
+changes it. Painting reads the last returned `unreadCount` without invoking Core.
+
+Payload: `{ state?: { unreadIds?: [id, ...] }, action }`. Omitted state/identities
+mean an empty set. Identities are positive `u64` host-generated stable history
+record IDs; a replacing toast must keep the record's original identity.
+
+- `{ kind: "arrived", id, forgottenId?: id | null, historyVisible: boolean }`
+  records a new arrival or repeat. When either history entry point is visible,
+  it marks the whole history read. Otherwise it removes the evicted identity
+  (if supplied), moves the arriving identity to the front of the unread set and
+  counts it once. The evicted record may already be read or absent from the set.
+- `{ kind: "markAllRead" }` marks every record read, including when the user
+  explicitly clears the history. Repeated calls are idempotent.
+
+The response is `{ state: { unreadIds: [...] }, unreadCount }`. The count is the
+number of distinct unread records; it does not rely on unread records forming a
+prefix in the host's display order. Closing a history entry point changes no
+read state. A new arrival after reading may make the same identity unread again.
+The state belongs to one window and is discarded when that window closes.
+
+The wire safety bound is 1024 unread identities; a host may keep a smaller
+history and supplies its evicted identity with the next arrival. Zero IDs,
+duplicate input IDs, over-limit state or results, unknown fields/actions and
+malformed payloads return `invalid_request`, without a replacement state. Hosts
+preserve the last valid read projection and record the failure; they do not
+reimplement the rules as a fallback. No notification content is included in the
+state or diagnostic payload.
+
+[Shared read-state fixture](../fixtures/workbench/notification-read-state-v1.json)
+executes through the rule dispatcher, the Core JSON envelope and the desktop
+bridge. It covers repeats, either history entry point, clearing, visible
+arrivals, non-prefix display order, read/unread eviction and invalid inputs.

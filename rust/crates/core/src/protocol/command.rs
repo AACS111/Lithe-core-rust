@@ -144,6 +144,9 @@ pub enum CoreCommand {
     /// button placement, hidden stripe buttons and open tool panels (`workbench.chromeLayout.reduce`),
     /// from `lithe-core-rules`.
     WorkbenchChromeLayoutReduce,
+    /// Applies a notification arrival or marks window-owned history read
+    /// (`workbench.notifications.reduceReadState`), from `lithe-core-rules`.
+    WorkbenchNotificationsReduceReadState,
     /// Resolves terminal link candidates into file or external targets (`terminal.parseLinkTarget`).
     TerminalParseLinkTarget,
     /// Decodes one chunk of console output with ANSI escapes into plain lines and styled ranges
@@ -1228,6 +1231,9 @@ impl CoreCommand {
                 Some(Self::Workspace(WorkspaceCommand::VisibilityDefaults))
             }
             "workbench.chromeLayout.reduce" => Some(Self::WorkbenchChromeLayoutReduce),
+            "workbench.notifications.reduceReadState" => {
+                Some(Self::WorkbenchNotificationsReduceReadState)
+            }
             "terminal.parseLinkTarget" => Some(Self::TerminalParseLinkTarget),
             "outputStyle.decode" => Some(Self::OutputStyleDecode),
             "debug.createSession" => Some(Self::Debug(DebugCommand::CreateSession)),
