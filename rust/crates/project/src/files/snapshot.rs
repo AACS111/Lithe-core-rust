@@ -9,6 +9,9 @@ pub fn snapshot(request: WorkspaceSnapshotRequest) -> Result<WorkspaceSnapshotRe
     search_index::invalidate_root(&root);
     let rules = VisibilityRules::new(request.hidden_directory_names, request.hidden_file_patterns)
         .with_workspace_roots(&root, &request.workspace_roots);
+    if let Some(policy) = &indexing_policy {
+        policy.prefetch_git_answers(&rules)?;
+    }
     let mut files = Vec::new();
     let mut nested_worktrees = Vec::new();
     let mut incomplete_directories = Vec::new();
