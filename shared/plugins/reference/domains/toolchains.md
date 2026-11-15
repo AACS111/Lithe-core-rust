@@ -108,6 +108,20 @@
 
 `toolchains.instantiateLaunch` 的 `executable` 必填；`home` 是解析出的工具主目录，`entry` 是绝对文件路径，`runtimeArguments` 和 `arguments` 是字符串列表。文本最多 4096 字节，列表最多 1024 项、每项最多 64 KiB，都不含 NUL。模板里的 `${executable}`、`${home}`、`${entry}`、`${runtimeArguments}`、`${arguments}` 被对应的值替换，列表原位展开；其他占位符原样保留。调用方给了模板带不动的值（给不启动入口的工具一个 `entry`，或给不接受参数的工具参数），或漏了模板需要的 `${home}`、`${entry}`，是 `plugin.toolchain.launchMismatch`；未知或已停用的 `tool` 是 `plugin.toolchain.invalidParams`，`field` 为 `tool`。这个命令不做任何本机 I/O：选可执行文件、探测版本、启动进程都由宿主完成。
 
+### 安装缺失的命令
+
+`systemCommand` 启动只写裸命令名（如 `dlv`、`gopls`），机器上没有时启动失败。清单顶层 `commandInstallers[]` 告诉宿主怎样用插件已经依赖的工具（`requiresTools` 里的工具定义）安装它，用户在插件管理里点安装即可，不用开终端。需要能力 `commandInstallers` 0 和权限 `commands.install`。
+
+| 项目 | 规则 |
+| --- | --- |
+| 声明 | `id`、`commands`（1–8 个本清单 `systemCommand` 启动用到的裸命令，一个命令只归一个安装）、`tool`、`minimumVersion?`、字面量 `arguments`、`mayUseNetwork`、`timeoutSeconds?`（1–3600，默认 600）、`targets` |
+| `managed` 目标 | 装进宿主为插件管理的目录（应用数据目录，不在应用包、安装目录或插件包里，卸载插件时删除）。`arguments`（替换安装的参数）或 `environment` 必须用唯一的模板变量 `${installDirectory}`；`commandDirectory` 是命令所在的子目录 |
+| `toolDefault` 目标 | 装到工具默认位置，值都是字面量。`directory` 最多 4 个探针，按顺序用同一工具运行，第一个输出绝对目录的探针决定位置；`pathList` 取路径列表第一项，`append` 拼接子目录 |
+| 宿主做什么 | `plugins.commandInstallers.requirements` 列出每个启动缺哪些命令、由哪个安装提供；`toolDefault` 先运行探针，把输出交给 `defaultDirectory`；向用户展示工具、完整命令行、是否联网和每个目标的目录，用户选定后用 `plan` 展开并运行，显示输出、可取消、超时停止，结束后确认命令确实在目录里 |
+| 之后的启动 | 宿主查找这个插件的 `systemCommand` 时，除 `PATH` 外还查插件的受管命令目录和记录下来的默认目录 |
+| 不覆盖 | 构建系统和执行提供者通过 `invocation.executables` 解析的可执行文件 |
+| 安装审查 | 每个安装都是审查里的程序（`kind: "commandInstaller"`），改了要运行的内容需要重新批准 |
+
 ### 本机文档
 
 `.lithe/toolchains/local.json` 的 `version` 仍为 `1`，这是 Core 当前校验的格式。`toolchains.resolvePins` 校验 `{version: 1, toolchains, pins?}`，`pins` 按目录记录 `{home, version, provider}`。这个文档只读取，不授予执行权限，也不写文件；保存固定尚未实现。
@@ -118,6 +132,7 @@
 | --- | --- |
 | 工具定义（`toolDefinitions`） | 已声明。设置页的发现结果，以及构建和运行选择工具，都通过共享 Core 解析器完成 |
 | 工具链提供者（`toolchainProviders`） | 未声明。提供者查询路线不可用，需要它的插件不会被提供安装 |
+| 安装缺失的命令（`commandInstallers`） | 未声明 |
 | 语言服务器的 `{kind: "tool"}` 启动应答 | 启动时被拒绝，因为工具还没有经过工具链注册表解析（见[语言](languages.md)） |
 | 保存固定（pin）、`toolchainConsumers`、通用运行时启动、提供者热激活 | 契约尚未提供 |
 
@@ -139,6 +154,7 @@
 | [Pins and snapshot resolution](../../contract/v1/toolchains/README.md#pins-and-snapshot-resolution) | `local.json`、`resolve`、四层选择、`checkVersion`、`discoveryPlan` |
 | [Settings candidates](../../contract/v1/toolchains/README.md#settings-candidates) | `candidates` 和两次调用的探测流程 |
 | [Executable resolution](../../contract/v1/README.md#executable-resolution) | 可执行文件候选的排序和严格选择 |
+| [Command installers](../../contract/v1/README.md#command-installers) | `commandInstallers[]` 的字段、两个目标、三个 Core 命令和宿主步骤 |
 | [Provider backend negotiation](../../contract/v1/toolchains/README.md#provider-backend-negotiation) | `litheToolchains` 协商、`lsp.toolchainRequest`、超时 |
 
 ### 示例与用例
@@ -148,6 +164,7 @@
 | [`toolchains/tool-definition.plugin.json`](../../contract/v1/fixtures/toolchains/tool-definition.plugin.json) | 生产形态的工具定义（`java`）：项目和全局设置、工具链请求、`JAVA_HOME`、`java` 命令等候选，以及 macOS 的 `JavaVirtualMachines` 目录发现 |
 | [`toolchains/toolchain-provider.plugin.json`](../../contract/v1/fixtures/toolchains/toolchain-provider.plugin.json) | 生产形态的版本管理器提供者（`mise`）：覆盖多个工具，监视项目版本文件（`.tool-versions` 用兼容读取器），后端是包内可执行文件 |
 | [`run/tool-reference-launch.plugin.json`](../../contract/v1/fixtures/run/tool-reference-launch.plugin.json) | 清单顶层 `requiresTools` 列出插件自己定义的 `interpreter`，语言服务器的 `runtime` 启动按这个工具定义 ID 引用运行时 |
+| [`command-installers/command-installer.plugin.json`](../../contract/v1/fixtures/command-installers/command-installer.plugin.json)、[`command-installer-plans.json`](../../contract/v1/fixtures/command-installers/command-installer-plans.json) | 语言服务器和调试适配器缺的命令各有一个安装：一个两种目标都有、用环境变量传目录，一个只有 `managed`、替换参数并指定命令子目录；以及三个命令在 Unix 和 Windows 上的期望结果 |
 
 Core 的验收测试在主仓库的 [`toolchain_definitions.rs`](https://github.com/Lithe-IDEA/Lithe-core-rust/blob/main/rust/crates/core/src/tests/toolchain_definitions.rs) 和同目录的 `toolchain_pins.rs`、`toolchain_queries.rs`、`toolchain_resolution.rs`。这三个测试共用的固定值文档、查询往返和每个稳定失败码的错误回复内联在 [`toolchain_vectors.rs`](https://github.com/Lithe-IDEA/Lithe-core-rust/blob/main/rust/crates/core/src/tests/toolchain_vectors.rs) 里。
 
@@ -264,6 +281,20 @@ When a plugin starts a process by tool-definition ID (a launch plan with `launch
 
 `toolchains.instantiateLaunch` requires `executable`. `home` is the resolved tool home, `entry` an absolute file path, and `runtimeArguments` and `arguments` string lists. A text is at most 4096 bytes; a list has at most 1024 items of 64 KiB each; none may hold a NUL. `${executable}`, `${home}`, `${entry}`, `${runtimeArguments}`, and `${arguments}` are replaced by their values, lists expanding in place; other tokens are kept as written. A value the template cannot carry (an `entry` for a tool that launches none, or arguments for one that takes none), or a missing `${home}` or `${entry}`, is `plugin.toolchain.launchMismatch`. An unknown or disabled `tool` is `plugin.toolchain.invalidParams` with `field` `tool`. The command performs no native I/O: selecting the executable, probing its version, and starting the process are the host's work.
 
+### Installing missing commands
+
+A `systemCommand` launch names only a bare command (such as `dlv` or `gopls`), and fails when the machine lacks it. The top-level `commandInstallers[]` tells the host how to install it with a tool the plugin already requires (a tool definition in `requiresTools`), so the user installs it from plugin management instead of a terminal. It requires the `commandInstallers` 0 capability and the `commands.install` permission.
+
+| Item | Rule |
+| --- | --- |
+| Declaration | `id`, `commands` (1 to 8 bare commands that `systemCommand` launches of this manifest name; one installer per command), `tool`, `minimumVersion?`, literal `arguments`, `mayUseNetwork`, `timeoutSeconds?` (1 to 3600, 600 by default), `targets` |
+| `managed` target | Installs into a directory the host manages for the plugin (in application data, never in the app bundle, installation directory or plugin package; removed with the plugin). `arguments` (replacing the installer's) or `environment` must use `${installDirectory}`, the only template variable; `commandDirectory` is the subdirectory the commands land in |
+| `toolDefault` target | Installs wherever the tool installs by default; every value is literal. `directory` holds up to 4 probes run in order with the same tool; the first to print an absolute directory decides; `pathList` takes the first entry of a path list and `append` adds a subdirectory |
+| Host steps | `plugins.commandInstallers.requirements` lists which commands each launch lacks and which installer provides them; for `toolDefault` the host runs the probes and sends their output to `defaultDirectory`; it shows the tool, the full command line, the network use and the directory of each target, then expands the chosen one with `plan` and runs it, showing the output, allowing cancel and stopping it at the timeout, and finally checks the commands are in the directory |
+| Later launches | The host looks for the plugin's `systemCommand` launches in its managed command directory and the recorded default directories as well as on `PATH` |
+| Not covered | Executables of build systems and execution providers resolved through `invocation.executables` |
+| Install review | Every installer is a reviewed program (`kind: "commandInstaller"`); a change to what it runs needs approval again |
+
 ### Local document
 
 `.lithe/toolchains/local.json` keeps `version` `1`, which is the format Core validates today. `toolchains.resolvePins` validates `{version: 1, toolchains, pins?}`, where `pins` maps directory keys to `{home, version, provider}`. The document is read, not written; it grants no execution authority; saving pins is not implemented.
@@ -274,6 +305,7 @@ When a plugin starts a process by tool-definition ID (a launch plan with `launch
 | --- | --- |
 | Tool definitions (`toolDefinitions`) | Declared. Settings discovery results, and Build and Run tool selection, go through the shared Core resolver |
 | Toolchain providers (`toolchainProviders`) | Not declared. The provider query route is unavailable, and a plugin that needs it is not offered for installation |
+| Installing missing commands (`commandInstallers`) | Not declared |
 | Language server `{kind: "tool"}` launch answer | Refused at start, because the tool is not yet resolved through the toolchain registry (see [Languages](languages.md)) |
 | Saving pins, `toolchainConsumers`, generic runtime launches, live provider activation | Not provided by the contract yet |
 
@@ -295,6 +327,7 @@ When a plugin starts a process by tool-definition ID (a launch plan with `launch
 | [Pins and snapshot resolution](../../contract/v1/toolchains/README.md#pins-and-snapshot-resolution) | `local.json`, `resolve`, the four layers, `checkVersion`, `discoveryPlan` |
 | [Settings candidates](../../contract/v1/toolchains/README.md#settings-candidates) | `candidates` and its two-call probe flow |
 | [Executable resolution](../../contract/v1/README.md#executable-resolution) | Ordering and strict selection of executable candidates |
+| [Command installers](../../contract/v1/README.md#command-installers) | The fields of `commandInstallers[]`, the two targets, the three Core commands and the host steps |
 | [Provider backend negotiation](../../contract/v1/toolchains/README.md#provider-backend-negotiation) | `litheToolchains` negotiation, `lsp.toolchainRequest`, timeouts |
 
 ### Examples and cases
@@ -304,6 +337,7 @@ When a plugin starts a process by tool-definition ID (a launch plan with `launch
 | [`toolchains/tool-definition.plugin.json`](../../contract/v1/fixtures/toolchains/tool-definition.plugin.json) | A production-shaped tool definition (`java`): candidates from project and global settings, toolchain requests, `JAVA_HOME`, the `java` command, and discovery of `*.jdk` under macOS's `JavaVirtualMachines` directory |
 | [`toolchains/toolchain-provider.plugin.json`](../../contract/v1/fixtures/toolchains/toolchain-provider.plugin.json) | A production-shaped version-manager provider (`mise`): several tools, watched project version files (`.tool-versions` through the compatible reader), with a packaged backend |
 | [`run/tool-reference-launch.plugin.json`](../../contract/v1/fixtures/run/tool-reference-launch.plugin.json) | `requiresTools` lists the plugin's own `interpreter` definition, and a language server's `runtime` launch references the runtime by that tool-definition ID |
+| [`command-installers/command-installer.plugin.json`](../../contract/v1/fixtures/command-installers/command-installer.plugin.json), [`command-installer-plans.json`](../../contract/v1/fixtures/command-installers/command-installer-plans.json) | One installer each for the commands of a language server and a debug adapter: one with both targets that passes the directory through the environment, one with only `managed` that replaces the arguments and names a command subdirectory; and the expected results of the three commands on Unix and Windows |
 
 The Core acceptance tests are in [`toolchain_definitions.rs`](https://github.com/Lithe-IDEA/Lithe-core-rust/blob/main/rust/crates/core/src/tests/toolchain_definitions.rs), with `toolchain_pins.rs`, `toolchain_queries.rs`, and `toolchain_resolution.rs` beside it. The fixture documents, query round trips, and the error reply for each stable failure code shared by these tests are inlined in [`toolchain_vectors.rs`](https://github.com/Lithe-IDEA/Lithe-core-rust/blob/main/rust/crates/core/src/tests/toolchain_vectors.rs).
 

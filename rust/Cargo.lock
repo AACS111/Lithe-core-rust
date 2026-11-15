@@ -1285,6 +1285,7 @@ version = "0.1.0"
 dependencies = [
  "lithe-build",
  "lithe-debug",
+ "lithe-platform",
  "lithe-plugin-backend",
  "lithe-plugin-functions",
  "lithe-plugin-grammar",

@@ -84,6 +84,11 @@ pub const PROJECT_GENERATORS: &str = "projectGenerators";
 /// bindings; see `lithe_debug::adapters`.
 pub const DEBUG_ADAPTERS: &str = "debugAdapters";
 
+/// `commandInstallers[]`: how the host installs, after the user confirms, a
+/// bare command that one of the plugin's `systemCommand` launches needs; see
+/// `lithe_plugin_manifest::command_installers`.
+pub const COMMAND_INSTALLERS: &str = "commandInstallers";
+
 /// Independent providers that translate external shortcut settings.
 pub const KEYMAP_IMPORT_PROVIDERS: &str = "keymapImportProviders";
 /// `pluginFunctions`: functions exported to, and called from, other plugins;
@@ -105,6 +110,7 @@ pub const SUPPORTED_CAPABILITIES: &[(&str, &[u32])] = &[
     (BUILD_MODEL_INPUTS, &[0]),
     (BUILD_PROVIDERS, &[0]),
     (BUILD_SYSTEMS, &[0]),
+    (COMMAND_INSTALLERS, &[0]),
     (DEBUG_ADAPTERS, &[0]),
     (EXECUTION_PROVIDERS, &[0]),
     (KEYMAP_IMPORT_PROVIDERS, &[0]),

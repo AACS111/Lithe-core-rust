@@ -38,6 +38,7 @@
 | `buildModelInputs` | 0 | 2026-11-11 | [#17](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/17) |
 | `buildProviders` | 0 | 2026-11-11 | [#17](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/17) |
 | `buildSystems` | 0 | 2026-11-11 | [#17](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/17) |
+| `commandInstallers` | 0 | 2026-11-15 | [#53](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/53) |
 | `debugAdapters` | 0 | 2026-11-11 | [#17](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/17) |
 | `executionProviders` | 0 | 2026-11-11 | [#17](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/17) |
 | `keymapImportProviders` | 0 | 2026-11-11 | [#17](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/17) |
@@ -133,6 +134,7 @@
 
 | PR | 修改人 | API 编号 | 协议 / 能力 | 改了什么 |
 | --- | --- | --- | --- | --- |
+| [#53](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/53) | [@xiaoyumuxi](https://github.com/xiaoyumuxi) | API-23 | **`commandInstallers` 0** | 新能力 `commandInstallers` 和权限 `commands.install`：清单顶层 `commandInstallers[]` 声明怎样用插件已依赖的工具（`requiresTools`）安装 `systemCommand` 启动缺的裸命令，例如用 `go install` 装 `dlv`。每个安装声明 `commands`、`tool`、`minimumVersion?`、字面量 `arguments`、`mayUseNetwork`、`timeoutSeconds?`（1–3600，默认 600）和至少一个目标：`managed` 装进宿主为插件管理的目录，参数或环境变量必须用唯一的模板变量 `${installDirectory}`，`commandDirectory` 指命令所在的子目录；`toolDefault` 装到工具默认位置，`directory` 最多 4 个探针，按顺序运行同一工具，从输出读目录（`pathList`、`append`）。新增宿主命令 `plugins.commandInstallers.requirements`、`plan`、`defaultDirectory` 和错误码 `plugin.commandInstaller.unknown`、`targetUndeclared`、`directoryInvalid`、`probeOutputsInvalid`（Core），以及宿主报告的 `plugin.command.missing`、`plugin.commandInstaller.failed`、`timedOut`、`commandsMissing`。安装声明进入安装审查（`kind: "commandInstaller"`）。宿主只在用户确认命令行、网络和目标后安装。 |
 | [#52](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/52) | [@xiaoyumuxi](https://github.com/xiaoyumuxi) | API-23 | `toolDefinitions` 0 内的补充 | 工具定义的版本探针 `version.arguments` 第一个参数可以是子命令（如 Go 的 `go version` 写 `["version"]`），之后的参数仍然只能是选项，第一个之后出现裸词以 `plugin.manifest.invalid`（字段 `version.arguments`）拒绝；清单 schema 改用 `prefixItems` 并补上 `uniqueItems`。不需要新能力版本。 |
 | [#47](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/47) | [@xiaoyumuxi](https://github.com/xiaoyumuxi) | API-30 | `debugAdapters` 0 内的补充 | `targetBindings.program` 新增来源 `target.directory`：`target.path` 所在的目录，供 Delve 这类按包构建再调试的适配器使用；路径没有所在目录时以 `debug.target.invalid`（字段 `target.path`）拒绝。新增宿主命令 `debug.adapters.readAnnouncement`，宿主把 `tcpAnnounced` 适配器的输出逐行交给它，第一行含 `prefix` 的输出是公告，前缀之后是 `port`（连 `127.0.0.1`）或带回环主机的 `host:port`，返回 `none`、`announced` 或 `invalid`（`malformed`、`notLoopback`）；契约写明宿主怎样读公告、10 秒内没有公告就启动失败。清单格式只多了一个枚举值，不需要新能力版本。 |
 

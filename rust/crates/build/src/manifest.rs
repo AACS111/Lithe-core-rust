@@ -15,9 +15,9 @@ use super::template::{self, Allowed, Availability, BuildArgument, Variable};
 use lithe_plugin_model::process::{ServerProcess, ServerRole};
 use lithe_plugin_model::settings::is_setting_identifier;
 use lithe_plugin_model::{
-    invalid, invalid_template as template_error, is_bare_command, is_identifier,
-    is_safe_relative_path, sorted_unique, validate_minimum_version, PluginRejection, UIIcon,
-    Validation,
+    invalid, invalid_template as template_error, is_bare_command, is_environment_name,
+    is_identifier, is_safe_relative_path, sorted_unique, validate_minimum_version, PluginRejection,
+    UIIcon, Validation,
 };
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};

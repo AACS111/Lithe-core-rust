@@ -1,5 +1,6 @@
 //! The identifier alphabets of the manifest contract: plugin, function and
-//! short IDs, package-relative paths, and bare command names.
+//! short IDs, package-relative paths, bare command names, and environment
+//! variable names.
 
 use std::collections::BTreeSet;
 
@@ -24,6 +25,17 @@ pub fn is_bare_command(value: &str) -> bool {
         && !value.contains('\\')
         && !value.contains('\0')
         && !value.chars().any(char::is_whitespace)
+}
+
+/// An environment variable name a manifest may set: uppercase letters,
+/// digits and `_`, not starting with a digit, at most 64 bytes.
+pub fn is_environment_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && !value.starts_with(|character: char| character.is_ascii_digit())
+        && value.chars().all(|character| {
+            character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+        })
 }
 
 /// Language tag in the `language[-Script][-REGION]` form used by `.lproj`

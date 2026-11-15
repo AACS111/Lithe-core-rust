@@ -187,7 +187,7 @@ pub(crate) fn provider_hints(request: &OutputPlanRequest) -> Validation<Map<Stri
         params.insert("tool".to_string(), json!({ "executable": executable }));
         if tool.environment.len() > 64
             || tool.environment.iter().any(|(key, value)| {
-                !super::manifest::is_environment_name(key)
+                !lithe_plugin_model::is_environment_name(key)
                     || value.len() > 32768
                     || value.contains('\0')
             })

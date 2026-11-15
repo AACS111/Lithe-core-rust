@@ -235,6 +235,12 @@ pub enum PluginsCommand {
     LanguageServersDecodeLaunch,
     /// Picks the stored language-server state the host may delete (`plugins.languageServers.stateRetention`).
     LanguageServersStateRetention,
+    /// Lists the bare commands a plugin's launches need and their installers (`plugins.commandInstallers.requirements`).
+    CommandInstallersRequirements,
+    /// Expands a command installer for the target the user chose (`plugins.commandInstallers.plan`).
+    CommandInstallersPlan,
+    /// Reads where a `toolDefault` installation puts its commands (`plugins.commandInstallers.defaultDirectory`).
+    CommandInstallersDefaultDirectory,
     /// Checks a plugin content provider's answer (`plugins.contentProviders.decode`).
     ContentProvidersDecode,
     /// Merges a plugin's stored setting layers into effective values (`plugins.declarative.resolveSettings`).
@@ -994,6 +1000,15 @@ impl CoreCommand {
             "plugins.languageServers.stateRetention" => {
                 Some(Self::Plugins(PluginsCommand::LanguageServersStateRetention))
             }
+            "plugins.commandInstallers.requirements" => {
+                Some(Self::Plugins(PluginsCommand::CommandInstallersRequirements))
+            }
+            "plugins.commandInstallers.plan" => {
+                Some(Self::Plugins(PluginsCommand::CommandInstallersPlan))
+            }
+            "plugins.commandInstallers.defaultDirectory" => Some(Self::Plugins(
+                PluginsCommand::CommandInstallersDefaultDirectory,
+            )),
             "plugins.contentProviders.decode" => {
                 Some(Self::Plugins(PluginsCommand::ContentProvidersDecode))
             }
@@ -1601,6 +1616,9 @@ mod tests {
             "lsp.pluginServerNotify",
             "plugins.languageServers.decodeLaunch",
             "plugins.languageServers.stateRetention",
+            "plugins.commandInstallers.requirements",
+            "plugins.commandInstallers.plan",
+            "plugins.commandInstallers.defaultDirectory",
             "plugins.contentProviders.decode",
             "lsp.cancelOperation",
             "lsp.pollEvents",

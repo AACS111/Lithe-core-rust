@@ -9,6 +9,7 @@
   "allOf": [
     {"if": {"required": ["outputLinkMatchers"]}, "then": {"properties": {"requires": {"required": ["outputLinkMatchers"]}}}},
     {"if": {"required": ["toolDefinitions"]}, "then": {"properties": {"requires": {"required": ["toolDefinitions"]}}}},
+    {"if": {"required": ["commandInstallers"]}, "then": {"required": ["permissions"], "properties": {"requires": {"required": ["commandInstallers"]}, "permissions": {"contains": {"const": "commands.install"}}}}},
     {"if": {"required": ["toolchainProviders"]}, "then": {"required": ["backend"], "properties": {"requires": {"required": ["toolchainProviders", "backend"]}, "permissions": {"allOf": [{"contains": {"const": "toolchains.provide"}}, {"contains": {"const": "backend.launch"}}]}}}},
     {"if": {"required": ["pluginFunctions"]}, "then": {"required": ["backend"], "properties": {"requires": {"required": ["pluginFunctions", "backend"]}}}},
     {"if": {"required": ["keymapImportProviders"]}, "then": {"required": ["backend", "permissions"], "properties": {"requires": {"required": ["keymapImportProviders", "backend"]}, "permissions": {"allOf": [{"contains": {"const": "keymaps.provide"}}, {"contains": {"const": "keymaps.readSelectedSources"}}, {"contains": {"const": "backend.launch"}}]}}}},
@@ -30,6 +31,7 @@
         "buildModelInputs": {"description": "Optional public model sharing between already enabled workspace plugins; no installation, private function, or process authority. Required exactly when modelSharing or modelInputs is used. Consumers require buildProviders. A producer cannot also consume inputs.", "enum": [0]},
         "buildProviders": { "description": "Required exactly when any buildSystems[].provider is present, including own-process and shared language-server providers. Declares host support for Provider orchestration (task execution, test execution and discovery, run preparation, native debug preparation, optional read-only model inputs, non-sensitive native configuration sources, inline test reports, opaque semantic test selectors, typed run options and service/task preparation, registry-selected adapters and host-owned connection targets for service debugging), independent of declarative buildSystems.", "enum": [0] },
         "buildSystems": { "description": "Declarative build detection, models, and command plans, including the executable setting adapter, instance-scoped options, and declarative preparation roles; does not imply buildProviders support.", "enum": [0] },
+        "commandInstallers": { "description": "Required exactly when commandInstallers is non-empty: installations of bare commands that systemCommand launches name, run by the host only after the user confirms them.", "enum": [0] },
         "debugAdapters": { "description": "Required exactly when debugAdapters is non-empty. Covers bounded target argument and environment bindings and debugAdapters[].features and defaults. The DAP session itself is negotiated by the adapter in initialize.", "enum": [0] },
         "executionProviders": { "enum": [0] },
         "languageServers": { "description": "Required exactly when languageServers is non-empty. Covers languageServers[].workspaceConfiguration and the session fields requestMethods, commands, serializedCommands, forwardNotifications, state, and remote.", "enum": [0] },
@@ -62,7 +64,7 @@
     },
     "permissions": {
       "type": "array",
-      "items": { "enum": ["backend.launch", "credentials.store", "debug.attach", "debug.launch", "languageServer.launch", "process.build", "process.run", "process.test", "process.vcs", "project.generate", "ui.contribute", "ui.web", "workspace.metadata",
+      "items": { "enum": ["backend.launch", "commands.install", "credentials.store", "debug.attach", "debug.launch", "languageServer.launch", "process.build", "process.run", "process.test", "process.vcs", "project.generate", "ui.contribute", "ui.web", "workspace.metadata",
           "workspace.files.read",
           "workspace.files.watch",
           "workspace.search",
@@ -144,6 +146,12 @@
       "type": "array",
       "maxItems": 16,
       "items": { "$ref": "#/$defs/debugAdapter" }
+    },
+    "commandInstallers": {
+      "description": "requires.commandInstallers: how the host installs bare commands that systemCommand launches of this manifest name. Requires the commands.install permission. Sorted by id when normalized.",
+      "type": "array",
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/commandInstaller" }
     },
     "projectGenerators": {
       "description": "requires.projectGenerators: entries of the New Project window. Requires the project.generate permission.",
@@ -924,6 +932,87 @@
           }
         }
       }
+    },
+    "commandInstaller": {
+      "description": "One way to install bare commands. The host shows the tool, the expanded command line, the network use and the target directory, and runs it only after the user confirms.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "commands", "tool", "arguments", "mayUseNetwork", "targets"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 64 },
+        "commands": {
+          "description": "Bare commands the installation provides. Each is named by a systemCommand launch of this manifest and by no other installer.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[^/\\\\\\s]+$" }
+        },
+        "tool": { "description": "The ID of a tool definition listed in requiresTools; its executable runs the installation and the directory probes.", "$ref": "#/$defs/toolchainToolID" },
+        "minimumVersion": { "$ref": "#/$defs/minimumVersion" },
+        "arguments": { "description": "Arguments after the tool's executable. Literal: no template variables.", "$ref": "#/$defs/commandInstallerArguments" },
+        "mayUseNetwork": { "description": "Whether the installation may download; shown before the user confirms.", "type": "boolean" },
+        "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600, "default": 600 },
+        "targets": {
+          "description": "Where the commands may land; the user chooses one when installing.",
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "managed": {
+              "description": "A directory the host owns for the plugin and removes with it. arguments or environment must use ${installDirectory}, the only template variable.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "arguments": { "description": "Replaces the installer's arguments.", "$ref": "#/$defs/commandInstallerArguments" },
+                "environment": { "$ref": "#/$defs/commandInstallerEnvironment" },
+                "commandDirectory": { "description": "Package-style relative path below the install directory where the commands land; the install directory itself when absent.", "$ref": "#/$defs/commandInstallerRelativePath" }
+              }
+            },
+            "toolDefault": {
+              "description": "Wherever the tool installs when told nothing. Literal values.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "arguments": { "description": "Replaces the installer's arguments.", "$ref": "#/$defs/commandInstallerArguments" },
+                "environment": { "$ref": "#/$defs/commandInstallerEnvironment" },
+                "directory": {
+                  "description": "Probes, tried in order, whose standard output names the directory the commands land in.",
+                  "type": "array",
+                  "maxItems": 4,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["arguments"],
+                    "properties": {
+                      "arguments": { "allOf": [{ "$ref": "#/$defs/commandInstallerArguments" }, { "minItems": 1 }] },
+                      "pathList": { "description": "The output is a list in the host's path separator; its first non-empty entry counts.", "type": "boolean" },
+                      "append": { "description": "Package-style relative path appended to the printed directory.", "$ref": "#/$defs/commandInstallerRelativePath" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "commandInstallerArguments": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "type": "string", "maxLength": 4096 }
+    },
+    "commandInstallerEnvironment": {
+      "description": "Variables set for the installation over the tool's environment.",
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": { "pattern": "^[A-Z_][A-Z0-9_]{0,63}$" },
+      "additionalProperties": { "type": "string", "maxLength": 4096 }
+    },
+    "commandInstallerRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)[.]{2}(?:/|$))[^\\\\\\u0000]+$"
     },
     "outputLinkMatcher": {
       "type": "object",
