@@ -1,6 +1,8 @@
 //! Workspace-owned indexing exclusions, independent of tree visibility and Git writes.
 
 use super::files::{existing_root, relative_path};
+use lithe_platform::paths::relative_path_contains;
+use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -593,15 +595,7 @@ pub fn prepare_provider_exclusions(root: &Path) -> Result<Option<Arc<IndexingCon
 }
 
 fn contains(directory: &str, path: &str) -> bool {
-    #[cfg(windows)]
-    let (directory, path) = (directory.to_lowercase(), path.to_lowercase());
-    #[cfg(windows)]
-    let (directory, path) = (directory.as_str(), path.as_str());
-    directory == "."
-        || path == directory
-        || path
-            .strip_prefix(directory)
-            .is_some_and(|suffix| suffix.starts_with('/'))
+    relative_path_contains(directory, path, Platform::HOST)
 }
 
 impl IndexingContext {

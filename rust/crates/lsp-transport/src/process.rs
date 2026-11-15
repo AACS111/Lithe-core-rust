@@ -1,26 +1,24 @@
 //! The language-server process boundary.
 //!
 //! The engine owns a language server's process and stdio, but it reaches them
-//! only through these traits. That keeps the platform-specific spawn in one
-//! place for the Windows client to substitute, and it lets the engine's
-//! lifecycle rules -- deadlines, crash handling, restart isolation -- be tested
-//! against a scripted server instead of a real one.
+//! only through these traits. That lets the engine's lifecycle rules --
+//! deadlines, crash handling, restart isolation -- be tested against a
+//! scripted server instead of a real one.
 //!
-//! On Windows a server and everything it starts share one Job Object, so a
-//! runtime a batch launcher starts ends with it and none outlives a crashed host.
+//! A local server and everything it starts form one
+//! [`lithe_git_host::ProcessTree`], so ending the server also ends a runtime
+//! that its launcher script started. On Windows the tree is a Job Object,
+//! which also ends it when the host crashes; on Unix it is a process group.
 
+use lithe_git_host::ProcessTree;
+use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
-#[cfg(target_os = "windows")]
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+use std::time::{Duration, Instant};
 
 /// Everything needed to start a language server, after provider adaptation has
 /// already rewritten the arguments.
@@ -111,8 +109,7 @@ impl LspProcessLauncher for SystemProcessLauncher {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        #[cfg(target_os = "windows")]
-        lithe_git_host::ProcessTree::prepare(&mut command);
+        ProcessTree::prepare(&mut command);
         let mut child = command.spawn().map_err(|error| {
             CoreError::new(
                 ErrorCode::ProcessStartFailed,
@@ -120,8 +117,7 @@ impl LspProcessLauncher for SystemProcessLauncher {
             )
             .with_details(error.to_string())
         })?;
-        #[cfg(target_os = "windows")]
-        let tree = lithe_git_host::ProcessTree::adopt(&mut child).map_err(|error| {
+        let tree = ProcessTree::adopt(&mut child).map_err(|error| {
             CoreError::new(
                 ErrorCode::ProcessStartFailed,
                 "Could not take ownership of the language-server process tree.",
@@ -142,7 +138,6 @@ impl LspProcessLauncher for SystemProcessLauncher {
                 input: Mutex::new(Some(stdin)),
                 child: Mutex::new(child),
                 termination_failure: Mutex::new(None),
-                #[cfg(target_os = "windows")]
                 tree,
             }),
             output: Box::new(stdout),
@@ -152,62 +147,96 @@ impl LspProcessLauncher for SystemProcessLauncher {
 }
 
 fn language_server_command(spec: &LspProcessSpec) -> Command {
-    #[cfg(target_os = "windows")]
-    if is_windows_batch_script(&spec.executable) {
-        let mut command = Command::new("cmd.exe");
-        command.envs(&spec.environment);
-        // Environment expansion is single-pass, so quoted values reach the batch
-        // file without cmd.exe interpreting path metacharacters or percent pairs.
-        command.env(
-            WINDOWS_BATCH_EXECUTABLE_ENV,
-            windows_batch_env_value(&spec.executable.to_string_lossy()),
-        );
-        for (index, argument) in spec.arguments.iter().enumerate() {
-            command.env(
-                windows_batch_argument_env(index),
-                windows_batch_env_value(argument),
-            );
-        }
-        command.raw_arg("/D");
-        command.raw_arg("/S");
-        command.raw_arg("/V:OFF");
-        command.raw_arg("/C");
-        command.raw_arg(windows_batch_command_line(spec.arguments.len()));
-        return command;
+    if let Some(batch) = BatchLaunch::new(spec, Platform::HOST) {
+        return batch.into_command();
     }
-
     let mut command = Command::new(&spec.executable);
     command.args(&spec.arguments).envs(&spec.environment);
     command
 }
 
-#[cfg(target_os = "windows")]
-fn is_windows_batch_script(executable: &Path) -> bool {
+/// Program that runs a Windows batch script.
+const BATCH_INTERPRETER: &str = "cmd.exe";
+
+/// Variable that carries the script path to [`BATCH_INTERPRETER`].
+const BATCH_EXECUTABLE_ENV: &str = "LITHE_LSP_BATCH_EXECUTABLE";
+
+/// How a Windows batch-script language server is started.
+///
+/// `cmd.exe` parses its command line with its own rules, so the script path
+/// and arguments travel in environment variables and the command line only
+/// references them. Environment expansion is single-pass, so the values
+/// reach the script without `cmd.exe` interpreting path metacharacters or
+/// percent pairs.
+#[derive(Debug, PartialEq, Eq)]
+struct BatchLaunch {
+    /// Variables added to the inherited environment, in the order set.
+    environment: Vec<(String, String)>,
+    /// `cmd.exe` arguments, each passed exactly as written.
+    arguments: Vec<String>,
+}
+
+impl BatchLaunch {
+    /// The launch of `spec` when `platform` runs it as a batch script.
+    fn new(spec: &LspProcessSpec, platform: Platform) -> Option<Self> {
+        if !platform.is_windows() || !is_batch_script(&spec.executable) {
+            return None;
+        }
+        let mut environment: Vec<_> = spec
+            .environment
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        environment.push((
+            BATCH_EXECUTABLE_ENV.to_string(),
+            batch_env_value(&spec.executable.to_string_lossy()),
+        ));
+        for (index, argument) in spec.arguments.iter().enumerate() {
+            environment.push((batch_argument_env(index), batch_env_value(argument)));
+        }
+        let arguments = ["/D", "/S", "/V:OFF", "/C"]
+            .into_iter()
+            .map(str::to_string)
+            .chain([batch_command_line(spec.arguments.len())])
+            .collect();
+        Some(Self {
+            environment,
+            arguments,
+        })
+    }
+
+    fn into_command(self) -> Command {
+        let mut command = Command::new(BATCH_INTERPRETER);
+        command.envs(self.environment);
+        for argument in self.arguments {
+            lithe_platform::process::verbatim_argument(&mut command, argument);
+        }
+        command
+    }
+}
+
+fn is_batch_script(executable: &Path) -> bool {
     matches!(
         executable.extension().and_then(|extension| extension.to_str()),
         Some(extension) if extension.eq_ignore_ascii_case("bat") || extension.eq_ignore_ascii_case("cmd")
     )
 }
 
-#[cfg(target_os = "windows")]
-const WINDOWS_BATCH_EXECUTABLE_ENV: &str = "LITHE_LSP_BATCH_EXECUTABLE";
-
-#[cfg(target_os = "windows")]
-fn windows_batch_argument_env(index: usize) -> String {
+fn batch_argument_env(index: usize) -> String {
     format!("LITHE_LSP_BATCH_ARGUMENT_{index}")
 }
 
-#[cfg(target_os = "windows")]
-fn windows_batch_command_line(argument_count: usize) -> String {
-    let mut command_line = format!("\"%{WINDOWS_BATCH_EXECUTABLE_ENV}%\"");
+fn batch_command_line(argument_count: usize) -> String {
+    let mut command_line = format!("\"%{BATCH_EXECUTABLE_ENV}%\"");
     for index in 0..argument_count {
-        command_line.push_str(&format!(" \"%{}%\"", windows_batch_argument_env(index)));
+        command_line.push_str(&format!(" \"%{}%\"", batch_argument_env(index)));
     }
     format!("\"{command_line}\"")
 }
 
-#[cfg(target_os = "windows")]
-fn windows_batch_env_value(value: &str) -> String {
+/// Escapes `value` so the Windows argument parser of the program the script
+/// starts reads it back unchanged inside the quotes of [`batch_command_line`].
+fn batch_env_value(value: &str) -> String {
     let mut escaped = String::new();
     let mut backslashes = 0;
     for character in value.chars() {
@@ -230,17 +259,16 @@ fn windows_batch_env_value(value: &str) -> String {
 }
 
 /// Interval between exit checks while a native disposal waits for the root.
-#[cfg(not(target_os = "windows"))]
-const DISPOSAL_POLL_MS: u64 = 10;
+const DISPOSAL_POLL: Duration = Duration::from_millis(10);
 
 struct SystemProcess {
     input: Mutex<Option<ChildStdin>>,
     child: Mutex<Child>,
     /// At most one pending cleanup category, transferred to the owning engine.
     termination_failure: Mutex<Option<std::io::Error>>,
-    /// The server and its descendants; dropping the handle ends all of them.
-    #[cfg(target_os = "windows")]
-    tree: lithe_git_host::ProcessTree,
+    /// The server and its descendants. On Windows dropping the handle also
+    /// ends all of them.
+    tree: ProcessTree,
 }
 
 impl LspProcessHandle for SystemProcess {
@@ -307,32 +335,18 @@ impl LspProcessHandle for SystemProcess {
     }
 
     fn dispose(&self, timeout: Duration) -> Result<(), CoreError> {
-        #[cfg(target_os = "windows")]
-        self.tree.terminate(timeout).map_err(|error| {
-            CoreError::new(
-                ErrorCode::ProcessFailed,
-                "Language-server process tree did not exit.",
-            )
-            .with_details(error.to_string())
-        })?;
         // A signalled child is reaped asynchronously, so an immediate status
         // read after termination can still report it running. Repeat the
         // idempotent kill and poll until the bounded disposal deadline. The
         // last kill failure explains a root that outlives the deadline.
-        #[cfg(not(target_os = "windows"))]
-        let kill_failure = {
-            let mut last = None;
-            let deadline = std::time::Instant::now() + timeout;
-            while self.exit_status().is_none() && std::time::Instant::now() < deadline {
-                if let Err(error) = self.terminate_native() {
-                    last = Some(error);
-                }
-                std::thread::sleep(Duration::from_millis(DISPOSAL_POLL_MS));
+        let deadline = Instant::now() + timeout;
+        let mut kill_failure = None;
+        while self.exit_status().is_none() && Instant::now() < deadline {
+            if let Err(error) = self.terminate_native() {
+                kill_failure = Some(error);
             }
-            last
-        };
-        #[cfg(target_os = "windows")]
-        let kill_failure: Option<std::io::Error> = None;
+            std::thread::sleep(DISPOSAL_POLL);
+        }
         if self.exit_status().is_none() {
             let error = CoreError::new(
                 ErrorCode::ProcessFailed,
@@ -343,13 +357,22 @@ impl LspProcessHandle for SystemProcess {
                 None => error,
             });
         }
-        Ok(())
+        // The root is reaped now, so a Unix process group counts only the
+        // descendants that are still alive.
+        self.tree
+            .terminate(deadline.saturating_duration_since(Instant::now()))
+            .map_err(|error| {
+                CoreError::new(
+                    ErrorCode::ProcessFailed,
+                    "Language-server process tree did not exit.",
+                )
+                .with_details(error.to_string())
+            })
     }
 }
 
 impl SystemProcess {
     fn terminate_native(&self) -> std::io::Result<()> {
-        #[cfg(target_os = "windows")]
         let tree_result = self.tree.kill();
         let child_result = match self.child.lock() {
             Ok(mut child) => match child.kill() {
@@ -360,7 +383,6 @@ impl SystemProcess {
             },
             Err(_) => Err(std::io::Error::other("Process lock poisoned")),
         };
-        #[cfg(target_os = "windows")]
         tree_result?;
         child_result
     }
@@ -374,218 +396,122 @@ fn missing_stream(stream: &str) -> CoreError {
     .with_details(stream)
 }
 
+// Starting real servers needs a host of each platform; those tests live in
+// the lithe-platform-tests package.
 #[cfg(test)]
-#[cfg(target_os = "windows")]
 mod tests {
     use super::{
-        language_server_command, windows_batch_command_line, LspProcessLauncher, LspProcessSpec,
-        SystemProcessLauncher, WINDOWS_BATCH_EXECUTABLE_ENV,
+        batch_command_line, batch_env_value, language_server_command, BatchLaunch, LspProcessSpec,
+        BATCH_EXECUTABLE_ENV,
     };
+    use lithe_platform::Platform;
     use std::collections::BTreeMap;
     use std::ffi::OsStr;
-    use std::fs;
-    use std::io::{Read, Write};
     use std::path::PathBuf;
-    use std::sync::mpsc;
-    use std::thread;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-    #[test]
-    fn batch_language_server_uses_cmd_exe() {
-        let spec = LspProcessSpec {
-            executable: PathBuf::from(r"C:\Program Files\Lithe\language-server.bat"),
-            arguments: vec!["-data".to_string(), r"C:\workspace data".to_string()],
-            working_directory: PathBuf::from(r"C:\workspace"),
-            environment: BTreeMap::new(),
-        };
-
-        let command = language_server_command(&spec);
-
-        assert_eq!(command.get_program(), OsStr::new("cmd.exe"));
-        assert_eq!(
-            windows_batch_command_line(spec.arguments.len()),
-            r#"""%LITHE_LSP_BATCH_EXECUTABLE%" "%LITHE_LSP_BATCH_ARGUMENT_0%" "%LITHE_LSP_BATCH_ARGUMENT_1%"""#
-        );
-        assert!(command.get_envs().any(|(name, value)| {
-            name == OsStr::new(WINDOWS_BATCH_EXECUTABLE_ENV)
-                && value == Some(spec.executable.as_os_str())
-        }));
-    }
-
-    /// Libtest name of [`argv_echo_helper`], which the batch test re-launches.
-    const ARGV_ECHO_TEST: &str = "process::tests::argv_echo_helper";
-    /// Separates libtest's own arguments from the arguments under test.
-    const ARGV_ECHO_MARKER: &str = "lithe-argv-echo";
-    const ARGV_ECHO_EXECUTABLE_ENV: &str = "LITHE_TEST_ARGV_ECHO_EXECUTABLE";
-    const ARGV_ECHO_OUTPUT_ENV: &str = "LITHE_TEST_ARGV_ECHO_OUTPUT";
-
-    /// Not a scenario of its own: a no-op unless the batch test launches this
-    /// test binary with it. It then writes the arguments that follow the marker
-    /// exactly as this native Windows process parsed them.
-    #[test]
-    fn argv_echo_helper() {
-        let Some(output) = std::env::var_os(ARGV_ECHO_OUTPUT_ENV) else {
-            return;
-        };
-        let arguments = std::env::args()
-            .skip_while(|argument| argument != ARGV_ECHO_MARKER)
-            .skip(1)
-            .collect::<Vec<_>>();
-        fs::write(output, arguments.join("\r\n")).expect("argument echo output");
-    }
-
-    /// Libtest name of [`stdin_hold_helper`], which the termination test
-    /// re-launches from a batch script.
-    const STDIN_HOLD_TEST: &str = "process::tests::stdin_hold_helper";
-    const STDIN_HOLD_ENV: &str = "LITHE_TEST_STDIN_HOLD";
-    const STDIN_HOLD_READY: &str = "lithe-stdin-hold-ready";
-
-    /// Not a scenario of its own: a no-op unless the termination test launches
-    /// this test binary with it. It then stays alive until its inherited stdin
-    /// closes, like the runtime a batch language-server launcher starts.
-    #[test]
-    fn stdin_hold_helper() {
-        if std::env::var_os(STDIN_HOLD_ENV).is_none() {
-            return;
+    fn spec(executable: &str, arguments: &[&str]) -> LspProcessSpec {
+        LspProcessSpec {
+            executable: PathBuf::from(executable),
+            arguments: arguments
+                .iter()
+                .map(|argument| argument.to_string())
+                .collect(),
+            working_directory: PathBuf::from("workspace"),
+            environment: BTreeMap::from([("JAVA_HOME".to_string(), "jdk".to_string())]),
         }
-        // Written past libtest's output capture, so the parent sees it at once.
-        let mut stdout = std::io::stdout().lock();
-        writeln!(stdout, "{STDIN_HOLD_READY}").expect("ready marker");
-        stdout.flush().expect("ready marker");
-        let _ = std::io::stdin().read_to_end(&mut Vec::new());
     }
 
     #[test]
-    fn terminating_a_batch_language_server_ends_the_process_it_started() {
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!("lithe lsp tree {stamp}"));
-        fs::create_dir_all(&root).expect("temp directory");
-        let executable = root.join("holding server.cmd");
-        fs::write(
-            &executable,
-            format!(
-                "@echo off\r\n\"%{ARGV_ECHO_EXECUTABLE_ENV}%\" --exact {STDIN_HOLD_TEST} --test-threads 1\r\n"
-            ),
-        )
-        .expect("batch script");
-        let spec = LspProcessSpec {
-            executable,
-            arguments: Vec::new(),
-            working_directory: root.clone(),
-            environment: BTreeMap::from([
+    fn windows_starts_batch_scripts_through_cmd_exe() {
+        let spec = spec(
+            r"C:\Program Files\Lithe\language-server.bat",
+            &["-data", r"C:\workspace data"],
+        );
+
+        let launch = BatchLaunch::new(&spec, Platform::Windows).expect("batch launch");
+
+        assert_eq!(
+            launch.arguments,
+            [
+                "/D",
+                "/S",
+                "/V:OFF",
+                "/C",
+                r#"""%LITHE_LSP_BATCH_EXECUTABLE%" "%LITHE_LSP_BATCH_ARGUMENT_0%" "%LITHE_LSP_BATCH_ARGUMENT_1%"""#,
+            ]
+        );
+        assert_eq!(
+            launch.environment,
+            [
+                ("JAVA_HOME".to_string(), "jdk".to_string()),
                 (
-                    ARGV_ECHO_EXECUTABLE_ENV.to_string(),
-                    std::env::current_exe()
-                        .expect("test executable")
-                        .to_string_lossy()
-                        .into_owned(),
+                    BATCH_EXECUTABLE_ENV.to_string(),
+                    r"C:\Program Files\Lithe\language-server.bat".to_string()
                 ),
-                (STDIN_HOLD_ENV.to_string(), "1".to_string()),
-            ]),
-        };
-
-        let streams = SystemProcessLauncher
-            .launch(spec)
-            .expect("launch batch script");
-        let mut output = streams.output;
-        let (events, received) = mpsc::channel();
-        thread::spawn(move || {
-            let mut seen = String::new();
-            let mut buffer = [0_u8; 1024];
-            let mut ready = false;
-            while let Ok(count) = output.read(&mut buffer) {
-                if count == 0 {
-                    break;
-                }
-                seen.push_str(&String::from_utf8_lossy(&buffer[..count]));
-                if !ready && seen.contains(STDIN_HOLD_READY) {
-                    ready = true;
-                    let _ = events.send("ready");
-                }
-            }
-            let _ = events.send("closed");
-        });
-        assert_eq!(
-            received.recv_timeout(Duration::from_secs(10)),
-            Ok("ready"),
-            "the batch script should start its native child"
+                (
+                    "LITHE_LSP_BATCH_ARGUMENT_0".to_string(),
+                    "-data".to_string()
+                ),
+                (
+                    "LITHE_LSP_BATCH_ARGUMENT_1".to_string(),
+                    r"C:\workspace data".to_string()
+                ),
+            ]
         );
-
-        streams.handle.terminate();
-
-        // The child holds the stdout pipe; it closes only once the child is
-        // gone too, not just the cmd.exe that started it.
-        assert_eq!(
-            received.recv_timeout(Duration::from_secs(10)),
-            Ok("closed"),
-            "terminating the server should end the process its script started"
-        );
-        fs::remove_dir_all(root).ok();
     }
 
     #[test]
-    fn batch_language_server_preserves_spaced_paths_and_shell_metacharacters() {
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!("lithe lsp batch {stamp}"));
-        fs::create_dir_all(&root).expect("temp directory");
-        let executable = root.join("scripted server.cmd");
-        let echo_output = root.join("arguments.txt");
-        // The script forwards `%*` to a native Windows program, which parses the
-        // command line the way a real native language server does.
-        // This test binary plays that program: starting PowerShell here instead
-        // took from 0.2 s to the whole per-test budget on CI runners.
-        fs::write(
-            &executable,
-            format!(
-                "@echo off\r\n\"%{ARGV_ECHO_EXECUTABLE_ENV}%\" --exact {ARGV_ECHO_TEST} --test-threads 1 {ARGV_ECHO_MARKER} %*\r\n"
-            ),
-        )
-        .expect("batch script");
-        let arguments = vec![
-            "workspace&echo_injected".to_string(),
-            "percent%PATH%value".to_string(),
-            "bang!value".to_string(),
-            "caret^value".to_string(),
-            "paren(value)".to_string(),
-            "quoted\"value".to_string(),
-            r"C:\workspace data\".to_string(),
+    fn batch_script_extensions_match_without_case() {
+        for executable in ["server.cmd", "server.CMD", "server.Bat"] {
+            assert!(
+                BatchLaunch::new(&spec(executable, &[]), Platform::Windows).is_some(),
+                "{executable}"
+            );
+        }
+        for executable in ["server.exe", "server", "server.sh", "server.bat.txt"] {
+            assert!(
+                BatchLaunch::new(&spec(executable, &[]), Platform::Windows).is_none(),
+                "{executable}"
+            );
+        }
+    }
+
+    #[test]
+    fn unix_runs_scripts_named_like_batch_files_directly() {
+        let spec = spec("/opt/server/language-server.cmd", &["--stdio"]);
+
+        assert_eq!(BatchLaunch::new(&spec, Platform::Unix), None);
+        if !Platform::HOST.is_windows() {
+            let command = language_server_command(&spec);
+            assert_eq!(
+                command.get_program(),
+                OsStr::new("/opt/server/language-server.cmd")
+            );
+            assert_eq!(command.get_args().collect::<Vec<_>>(), ["--stdio"]);
+        }
+    }
+
+    #[test]
+    fn the_command_line_only_references_environment_variables() {
+        assert_eq!(batch_command_line(0), r#"""%LITHE_LSP_BATCH_EXECUTABLE%"""#);
+        assert_eq!(
+            batch_command_line(1),
+            r#"""%LITHE_LSP_BATCH_EXECUTABLE%" "%LITHE_LSP_BATCH_ARGUMENT_0%"""#
+        );
+    }
+
+    #[test]
+    fn batch_values_escape_quotes_and_the_backslashes_before_them() {
+        let cases = [
+            ("plain", "plain"),
+            ("percent%PATH%value", "percent%PATH%value"),
+            ("quoted\"value", r#"quoted\"value"#),
+            (r#"slash\"quote"#, r#"slash\\\"quote"#),
+            (r"C:\workspace data\", r"C:\workspace data\\"),
+            (r"inner\path", r"inner\path"),
         ];
-        let spec = LspProcessSpec {
-            executable,
-            arguments: arguments.clone(),
-            working_directory: root.clone(),
-            environment: BTreeMap::from([
-                (
-                    ARGV_ECHO_EXECUTABLE_ENV.to_string(),
-                    std::env::current_exe()
-                        .expect("test executable")
-                        .to_string_lossy()
-                        .into_owned(),
-                ),
-                (
-                    ARGV_ECHO_OUTPUT_ENV.to_string(),
-                    echo_output.to_string_lossy().into_owned(),
-                ),
-            ]),
-        };
-
-        let mut streams = SystemProcessLauncher
-            .launch(spec)
-            .expect("launch batch script");
-        streams.handle.close_input();
-        // Reading to the end waits for the script and the echo process to exit.
-        let mut output = String::new();
-        streams.output.read_to_string(&mut output).expect("stdout");
-
-        let echoed = fs::read_to_string(&echo_output)
-            .unwrap_or_else(|error| panic!("echo output missing ({error}); stdout: {output}"));
-        assert_eq!(echoed, arguments.join("\r\n"));
-        fs::remove_dir_all(root).ok();
+        for (value, escaped) in cases {
+            assert_eq!(batch_env_value(value), escaped, "{value}");
+        }
     }
 }

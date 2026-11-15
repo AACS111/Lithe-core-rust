@@ -624,15 +624,8 @@ fn workspace_snapshot(root: &str) -> Result<String, CoreError> {
         .filter(|path| !path.is_empty())
     {
         lithe_protocol::cancellation::check()?;
-        #[cfg(unix)]
-        let relative = {
-            use std::os::unix::ffi::OsStrExt;
-            Path::new(std::ffi::OsStr::from_bytes(path))
-        };
-        #[cfg(not(unix))]
-        let relative = Path::new(
-            std::str::from_utf8(path).map_err(|_| invalid("Unsupported Git path encoding"))?,
-        );
+        let relative = lithe_platform::paths::native_path_from_bytes(path)
+            .ok_or_else(|| invalid("Unsupported Git path encoding"))?;
         let file_path = Path::new(root).join(relative);
         let metadata = fs::symlink_metadata(&file_path).map_err(snapshot_io_error)?;
         if metadata.file_type().is_symlink() {

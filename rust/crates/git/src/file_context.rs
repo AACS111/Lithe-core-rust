@@ -1,5 +1,7 @@
 //! Resolve a file to its actual Git checkout, independently of UI selection.
 
+use lithe_platform::paths::slash_separated;
+use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::path::{Component, Path, PathBuf};
@@ -114,11 +116,7 @@ pub fn resolve(request: Request) -> Result<Option<Context>, CoreError> {
     let relative = relative
         .to_str()
         .ok_or_else(|| CoreError::new(ErrorCode::InvalidRequest, "Git file path is not UTF-8"))?;
-    let relative = if cfg!(windows) {
-        relative.replace('\\', "/")
-    } else {
-        relative.to_owned()
-    };
+    let relative = slash_separated(relative, Platform::HOST).into_owned();
     if relative.is_empty() {
         return Err(CoreError::new(
             ErrorCode::InvalidRequest,
@@ -131,11 +129,7 @@ pub fn resolve(request: Request) -> Result<Option<Context>, CoreError> {
             "Git repository path is not UTF-8",
         )
     })?;
-    let root = if cfg!(windows) {
-        root.replace('\\', "/")
-    } else {
-        root.to_owned()
-    };
+    let root = slash_separated(root, Platform::HOST).into_owned();
     Ok(Some(Context {
         root,
         path: relative,

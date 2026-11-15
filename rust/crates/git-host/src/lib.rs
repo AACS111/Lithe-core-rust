@@ -355,12 +355,7 @@ impl InputFile {
             ));
             let mut options = OpenOptions::new();
             options.read(true).write(true).create_new(true);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::OpenOptionsExt;
-                options.mode(0o600);
-            }
-            match options.open(&path) {
+            match lithe_platform::fs::owner_only_file(&mut options).open(&path) {
                 Ok(file) => {
                     let mut owned = Self { file, path };
                     owned.file.write_all(input)?;

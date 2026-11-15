@@ -1,0 +1,12 @@
+[package]
+name = "lithe-platform-tests"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "Tests that need a real Windows or Unix host, and the fixture program they start"
+
+[dev-dependencies]
+lithe-git-host = { path = "../git-host" }
+lithe-lsp-transport = { path = "../lsp-transport" }
+lithe-platform = { path = "../platform" }

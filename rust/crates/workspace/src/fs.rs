@@ -142,13 +142,8 @@ fn native_metadata(metadata: std::fs::Metadata) -> Metadata {
     } else {
         methods::FileKind::Other
     };
-    #[cfg(unix)]
-    let mode = {
-        use std::os::unix::fs::PermissionsExt;
-        metadata.permissions().mode()
-    };
-    #[cfg(not(unix))]
-    let mode = 0;
+    // A Windows file stores no mode; Git snapshots then compare zero.
+    let mode = lithe_platform::fs::unix_mode(&metadata).unwrap_or(0);
     Metadata {
         kind,
         size: metadata.len(),
@@ -469,10 +464,8 @@ pub fn create_dir_mode(path_value: &Path, recursive: bool, mode: Option<u32>) ->
         None => {
             let mut builder = std::fs::DirBuilder::new();
             builder.recursive(recursive);
-            #[cfg(unix)]
             if let Some(mode) = mode {
-                use std::os::unix::fs::DirBuilderExt;
-                builder.mode(mode);
+                lithe_platform::fs::directory_mode(&mut builder, mode);
             }
             builder.create(path_value)
         }

@@ -392,7 +392,7 @@ pub fn run_sample_scenario(sample: &Sample) {
         serde_json::from_slice(&fs::read(package.join("plugin.json")).expect("sample manifest"))
             .expect("sample manifest JSON");
     let plugin_id = manifest["id"].as_str().expect("plugin ID").to_string();
-    let package_before = listing(&package);
+    let package_before = listing(package);
 
     // The manifest passes the same validation as an installed plugin.
     let validated = core(
@@ -620,7 +620,7 @@ pub fn run_sample_scenario(sample: &Sample) {
 
     // The backend wrote only to the host's state directory, never the package.
     assert!(
-        listing(&package) == package_before,
+        listing(package) == package_before,
         "the plugin package changed at runtime"
     );
     let state: Vec<_> = fs::read_dir(fixture.root.join("workspace-state"))

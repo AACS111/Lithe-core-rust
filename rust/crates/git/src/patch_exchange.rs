@@ -5,6 +5,7 @@ use super::{
     operation_state, repository_root, resolve_commit_revision, validate_root, CoreError, ErrorCode,
     GitCommandResponse, GitOperationStateRequest, TemporaryGitCommitContext,
 };
+use lithe_platform::Platform;
 use lithe_workspace::fs;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -243,7 +244,7 @@ fn parse_statistics(bytes: &[u8], allow_null_source: bool) -> Result<Vec<PatchFi
                 .next()
                 .ok_or_else(|| invalid("Missing destination patch path"))?;
             let original_path = if allow_null_source
-                && (original == b"/dev/null" || (cfg!(windows) && original == b"NUL"))
+                && (original == b"/dev/null" || original == Platform::HOST.null_device().as_bytes())
             {
                 None
             } else {
@@ -861,10 +862,8 @@ fn hash_optional_file(hash: &mut Sha256, path: &Path) -> Result<(), CoreError> {
 fn hash_working_file(hash: &mut Sha256, path: &Path) -> Result<(), CoreError> {
     use std::io::Read;
     let metadata = fs::symlink_metadata(path).map_err(patch_io_error)?;
-    #[cfg(unix)]
-    {
-        hash.update(metadata.mode().to_le_bytes());
-    }
+    // Zero for a local Windows file, which stores no mode.
+    hash.update(metadata.mode().to_le_bytes());
     hash.update([u8::from(metadata.file_type().is_symlink())]);
     if metadata.file_type().is_symlink() {
         let target = fs::read_link(path).map_err(patch_io_error)?;
