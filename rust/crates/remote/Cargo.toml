@@ -14,6 +14,14 @@ client = ["dep:sha2"]
 # target musl so the same static executable works in minimal containers.
 server = ["dep:libc", "dep:sha2", "dep:trash"]
 
+# The server runs on Linux and macOS hosts, and its integration tests start
+# the server binary of this package, so they cannot move to
+# lithe-platform-tests. CI runs them with the server feature on Linux and on
+# macOS (scripts/rust-core/affected-crates.mjs).
+[package.metadata.lithe-ci]
+hosts = ["macos"]
+test-features = ["server"]
+
 [dependencies]
 base64 = "0.22"
 serde = { version = "1", features = ["derive"] }

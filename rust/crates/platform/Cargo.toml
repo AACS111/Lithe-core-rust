@@ -6,3 +6,8 @@ license = "Apache-2.0"
 description = "Host platform rules as data: path comparison, Windows file names, Unix permissions and console-less processes"
 
 [dependencies]
+
+# Its tests check `Platform::HOST` against the host they run on, so CI also
+# runs them on macOS and Windows (scripts/rust-core/affected-crates.mjs).
+[package.metadata.lithe-ci]
+hosts = ["macos", "windows"]
