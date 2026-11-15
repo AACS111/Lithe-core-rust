@@ -556,3 +556,16 @@ the prefix does not confer authority. Core deduplicates only the generated count
 of the effective saved selector and validates it before use. Prepared team/local Run
 layers can be resolved without filesystem publication; native adapters own cancellation,
 source checks, metadata-preserving conditional writes, rollback and readback.
+
+
+### Machine-wide SDK catalog ownership
+
+Shared `toolchains.catalogState` / `toolchains.editCatalog` own the bounded global
+registration document and its merge semantics. Desktop adapters read it from the
+platform user-preference root, retain native source identity, publish only after
+explicit Save, and reread the result. No workspace is needed; opening settings
+creates no source. Registered homes and defaults become inert resolver inputs,
+never cached authority about an executable. A project may override the global
+default, while running processes retain their launch environment. Native SDK
+probing, cancellation and filesystem permissions remain adapter responsibilities;
+neither these commands nor runtime consumers write into SDKs or installed bundles.

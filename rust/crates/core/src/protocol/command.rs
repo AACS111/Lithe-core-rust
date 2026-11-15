@@ -389,6 +389,10 @@ pub enum KeymapCommand {
 #[derive(Debug, Clone)]
 /// The `toolchains.*` commands; their names live in [`CoreCommand::parse`].
 pub enum ToolchainsCommand {
+    /// Reads global SDK registrations and their native source plan.
+    CatalogState,
+    /// Plans a source-bound global SDK registration/default edit.
+    EditCatalog,
     /// Registers plugin-owned tools with verified package provenance.
     Registry,
     /// Validates provider answers using native evidence supplied by the host.
@@ -1084,6 +1088,8 @@ impl CoreCommand {
             "keymap.planImportSources" => Some(Self::Keymap(KeymapCommand::PlanImportSources)),
             "keymap.planImportBindings" => Some(Self::Keymap(KeymapCommand::PlanImportBindings)),
             "debug.startOrContinue" => Some(Self::Debug(DebugCommand::StartOrContinue)),
+            "toolchains.catalogState" => Some(Self::Toolchains(ToolchainsCommand::CatalogState)),
+            "toolchains.editCatalog" => Some(Self::Toolchains(ToolchainsCommand::EditCatalog)),
             "toolchains.registry" => Some(Self::Toolchains(ToolchainsCommand::Registry)),
             "toolchains.decodeReply" => Some(Self::Toolchains(ToolchainsCommand::DecodeReply)),
             "toolchains.failureReply" => Some(Self::Toolchains(ToolchainsCommand::FailureReply)),

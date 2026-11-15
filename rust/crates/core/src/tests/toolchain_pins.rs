@@ -397,3 +397,25 @@ fn source_edits_match_shared_fixture() {
         }
     }
 }
+#[test]
+fn global_catalog_commands_match_shared_fixture() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../../fixtures/toolchain-global-catalog.json"
+    ))
+    .unwrap();
+    for case in fixture["cases"].as_array().unwrap() {
+        let response: Value = serde_json::from_str(&crate::execute_json(
+            &json!({"command": case["command"], "payload": case["input"]}).to_string(),
+        ))
+        .unwrap();
+        if let Some(code) = case.get("error") {
+            assert_eq!(response["data"]["status"], "rejected", "{case}: {response}");
+            assert_eq!(
+                &response["data"]["error"]["code"], code,
+                "{case}: {response}"
+            );
+        } else {
+            assert_eq!(response["data"], case["expected"], "{case}: {response}");
+        }
+    }
+}

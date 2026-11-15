@@ -2,6 +2,7 @@
 //!
 //! No manager configuration, native scanning or process lifecycle belongs here.
 
+mod catalog;
 pub mod definitions;
 pub mod fixed;
 pub mod paths;
@@ -165,4 +166,14 @@ pub fn candidates_command(
         |input| resolution::candidates(input, validate_manifest),
         "candidates",
     )
+}
+
+/// Reads bounded machine-wide SDK registrations without project context or native I/O.
+pub fn catalog_state_command(input: Value) -> Result<Value, CoreError> {
+    command(input, catalog::state, "state")
+}
+
+/// Plans a complete conditional edit of the machine-wide SDK registry.
+pub fn edit_catalog_command(input: Value) -> Result<Value, CoreError> {
+    command(input, catalog::edit, "edit")
 }

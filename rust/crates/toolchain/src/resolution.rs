@@ -37,6 +37,7 @@ pub(crate) fn resolve(input: &Value, validate_manifest: ManifestValidator) -> Va
             "platform",
             "filesystemCaseSensitive",
             "workspaceRoot",
+            "global",
             "workspaceRoots",
             "filesystem",
             "minimumVersion",
@@ -69,6 +70,15 @@ pub(crate) fn resolve(input: &Value, validate_manifest: ManifestValidator) -> Va
         .get("local")
         .cloned()
         .unwrap_or(json!({"version":1,"toolchains":{}}));
+    if input["global"] == true
+        && ["toolchains", "pins"].iter().any(|key| {
+            document[*key]
+                .as_object()
+                .is_some_and(|value| !value.is_empty())
+        })
+    {
+        return Err(reject("local"));
+    }
     let pin = pins::resolve(&json!({"document":document,"directory":directory,"tool":tool}))?;
     let fixed = input
         .get("fixed")
@@ -270,6 +280,13 @@ pub(crate) fn resolve(input: &Value, validate_manifest: ManifestValidator) -> Va
     let mut default_checked = !default_preflight;
     for candidate in &candidates {
         let kind = candidate["kind"].as_str().unwrap_or("");
+        if input["global"] == true
+            && (kind == "projectFile"
+                || (kind == "setting" && candidate["layer"] == "project")
+                || (kind == "toolchain" && candidate["scope"] == "project"))
+        {
+            continue;
+        }
         let id = candidate["id"].as_str().unwrap_or(kind);
         let layer = match kind {
             "setting" if candidate["layer"] == "project" => "pinned",
