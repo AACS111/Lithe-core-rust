@@ -260,6 +260,19 @@ pub static EVENTS: &[EventMetadata] = &[
         owner: "Lithe",
     },
     EventMetadata {
+        id: "app.session.crash_capture_failed",
+        channel: "app",
+        level: LogLevel::Warn,
+        message: "Crash capture failed at {stage}",
+        fields: &[
+            FieldMetadata { name: "error", field_type: FieldType::Error, required: true, description: "Filesystem or runtime error of that step", reason: None },
+            FieldMetadata { name: "stage", field_type: FieldType::Token, required: true, description: "Step that failed: create when this session's crash file could not be made, so a fatal crash of this session is not recorded; claim when a previous session's crash file could not be read or removed; release when Close could not remove this session's file, so the next start reports this session as not closed", reason: None },
+        ],
+        span: None,
+        rate: 60,
+        owner: "Lithe",
+    },
+    EventMetadata {
         id: "app.session.previous_interrupted",
         channel: "app",
         level: LogLevel::Error,
