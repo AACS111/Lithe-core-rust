@@ -302,6 +302,55 @@ pub fn ignored_paths(
     ))
 }
 
+/// Reports which `directories` hold at least one tracked entry, with one
+/// `git ls-files` per pathspec batch instead of one per directory.
+///
+/// `directories` are `/`-separated literal pathspecs relative to `directory`, the
+/// same form `git ls-files` prints. `None` means Git could not answer, or printed a
+/// path that no requested directory contains (for example a differently normalized
+/// Unicode name); callers then fall back to asking about each directory.
+pub fn tracked_directories(
+    directory: &Path,
+    directories: &[String],
+) -> Result<Option<HashSet<String>>, CoreError> {
+    let requested = directories
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    let mut tracked = HashSet::new();
+    for batch in pathspec_batches(directories, LS_FILES_PATHSPEC_BUDGET) {
+        let mut arguments = vec![
+            "--literal-pathspecs".to_string(),
+            "ls-files".into(),
+            "-z".into(),
+            "--".into(),
+        ];
+        arguments.extend(batch.iter().cloned());
+        let response = execute_git_readonly(&directory.to_string_lossy(), &arguments, None);
+        lithe_protocol::cancellation::check()?;
+        let Ok(response) = response else {
+            return Ok(None);
+        };
+        if response.exit_code != 0 {
+            return Ok(None);
+        }
+        for path in response.stdout.split('\0').filter(|path| !path.is_empty()) {
+            // A gitlink prints the directory itself; files print a descendant.
+            let owners = path
+                .match_indices('/')
+                .map(|(index, _)| &path[..index])
+                .chain([path])
+                .filter(|prefix| requested.contains(prefix))
+                .collect::<Vec<_>>();
+            if owners.is_empty() {
+                return Ok(None);
+            }
+            tracked.extend(owners.into_iter().map(str::to_string));
+        }
+    }
+    Ok(Some(tracked))
+}
+
 /// Upper bound on the pathspec bytes passed to one `git ls-files` call.
 ///
 /// Windows limits a whole command line to 32,767 UTF-16 units; batching well

@@ -282,6 +282,9 @@ impl WorkspaceSearchIndex {
     fn build(root: &Path, rules: &VisibilityRules, names_only: bool) -> Result<Self, CoreError> {
         let mut paths = Vec::new();
         let policy = super::indexing::context(root);
+        if let Some(policy) = &policy {
+            policy.prefetch_git_answers(rules)?;
+        }
         collect_files(root, root, rules, &mut paths, policy.as_deref())?;
         let mut index = Self {
             files: Vec::new(),

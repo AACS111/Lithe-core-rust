@@ -1,11 +1,11 @@
 //! Workspace-owned indexing exclusions, independent of tree visibility and Git writes.
 
-use super::files::{existing_root, relative_path};
+use super::files::{existing_root, is_nested_linked_worktree, relative_path, VisibilityRules};
 use lithe_platform::paths::relative_path_contains;
 use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -70,9 +70,62 @@ pub struct IndexingContext {
     fallback_policy: Option<IndexingPolicy>,
     published: AtomicBool,
     decisions: Mutex<HashMap<String, bool>>,
+    /// Git answers fetched a directory level at a time before a walk. A parent's answers
+    /// reach `decisions` only when the walk asks about it, so prefetching never changes
+    /// which directories providers see as excluded.
+    prefetched: Mutex<HashMap<String, GitAnswer>>,
+    /// Visibility rules each finished prefetch walked with; the lock also serializes them.
+    prefetched_scopes: Mutex<Vec<PrefetchScope>>,
     pub(crate) retired: AtomicBool,
     git_failed: AtomicBool,
     git_resolved: AtomicBool,
+}
+
+/// What Git said about one directory during a prefetch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GitAnswer {
+    /// Not ignored, holding tracked content, or a nested repository.
+    Kept,
+    /// Ignored, with nothing tracked below it.
+    Excluded,
+    /// `check-ignore` failed; the walk records the directory as kept and Git as failed.
+    Unavailable,
+}
+
+/// The parts of `VisibilityRules` that decide where a prefetch descends.
+#[derive(PartialEq, Eq)]
+struct PrefetchScope {
+    hidden_directories: Vec<String>,
+    hidden_file_patterns: Vec<String>,
+    delegated_roots: Vec<PathBuf>,
+}
+
+impl PrefetchScope {
+    fn of(rules: &VisibilityRules) -> Self {
+        Self {
+            hidden_directories: rules.hidden_directories.clone(),
+            hidden_file_patterns: rules.hidden_file_patterns.clone(),
+            delegated_roots: rules.delegated_roots.clone(),
+        }
+    }
+}
+
+/// A directory whose children the next prefetch level asks Git about.
+struct PrefetchDirectory {
+    path: PathBuf,
+    /// Where Git runs: the nearest directory holding `.git`, or the workspace root.
+    repository: PathBuf,
+    /// `path` relative to `repository`, ending in `/` unless empty.
+    prefix: String,
+}
+
+/// One child directory found by a prefetch level.
+struct PrefetchChild {
+    path: PathBuf,
+    /// Workspace-relative key, the same form `prepare_parent` stores.
+    key: String,
+    /// Literal pathspec relative to the group's repository.
+    pathspec: String,
 }
 
 /// A failed installer may reclaim a token only before any caller has received it.
@@ -178,6 +231,8 @@ pub fn configure(
                 fallback_policy,
                 published: AtomicBool::new(false),
                 decisions: Mutex::default(),
+                prefetched: Mutex::default(),
+                prefetched_scopes: Mutex::default(),
                 retired: AtomicBool::new(false),
                 git_failed: AtomicBool::new(false),
                 git_resolved: AtomicBool::new(false),
@@ -355,6 +410,8 @@ fn rollback_failed_policy(root: &Path, failed: &Arc<IndexingContext>) -> Result<
         fallback_policy: Some(policy),
         published: AtomicBool::new(true),
         decisions: Mutex::default(),
+        prefetched: Mutex::default(),
+        prefetched_scopes: Mutex::default(),
         retired: AtomicBool::new(false),
         git_failed: AtomicBool::new(false),
         git_resolved: AtomicBool::new(false),
@@ -519,6 +576,12 @@ fn release_lease(
         .lock()
         .map_err(|_| CoreError::new(ErrorCode::Unknown, "Indexing decision lock was poisoned"))?
         .clear();
+    // The retired record stays installed to cancel late readers; free its walk-sized caches.
+    context
+        .prefetched
+        .lock()
+        .map_err(|_| CoreError::new(ErrorCode::Unknown, "Indexing prefetch lock was poisoned"))?
+        .clear();
     drop(leases);
     drop(entries);
     super::search_index::invalidate_root(&root);
@@ -566,6 +629,8 @@ fn refreshed_context(old: &IndexingContext) -> Arc<IndexingContext> {
         fallback_policy: old.fallback_policy.clone(),
         published: AtomicBool::new(old.published.load(Ordering::Acquire)),
         decisions: Mutex::default(),
+        prefetched: Mutex::default(),
+        prefetched_scopes: Mutex::default(),
         retired: AtomicBool::new(false),
         git_failed: AtomicBool::new(false),
         git_resolved: AtomicBool::new(false),
@@ -580,6 +645,8 @@ pub fn prepare_provider_exclusions(root: &Path) -> Result<Option<Arc<IndexingCon
     };
     context.check()?;
     if context.policy.git_ignore_enabled && !context.git_resolved.load(Ordering::Acquire) {
+        // The same built-in rules as the snapshot below, which then reuses this prefetch.
+        context.prefetch_git_answers(&VisibilityRules::new(Vec::new(), Vec::new()))?;
         context.prepare_parent(root, "")?;
         super::files::snapshot(super::files::WorkspaceSnapshotRequest {
             root: root.to_string_lossy().into_owned(),
@@ -689,6 +756,9 @@ impl IndexingContext {
             .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
             .filter_map(|entry| entry.file_name().into_string().ok())
             .collect::<Vec<_>>();
+        if let Some(decisions) = self.prefetched_decisions(parent, &candidates)? {
+            return self.store_decisions(decisions);
+        }
         let ignored = lithe_git::ignored_paths(parent, &candidates)?;
         let mut decisions = HashMap::new();
         if let Some(ignored) = ignored {
@@ -732,12 +802,249 @@ impl IndexingContext {
                 decisions.insert(relative_path(&parent.join(name), &self.root), false);
             }
         }
+        self.store_decisions(decisions)
+    }
+
+    fn store_decisions(&self, decisions: HashMap<String, bool>) -> Result<(), CoreError> {
         self.check()?;
         let mut cache = self.decisions.lock().map_err(|_| {
             CoreError::new(ErrorCode::Unknown, "Indexing decision lock was poisoned")
         })?;
         cache.extend(decisions);
         Ok(())
+    }
+
+    /// Decisions for `parent`'s `candidates` from a prefetch, or `None` when any candidate
+    /// was not answered there, such as a directory created after the prefetch.
+    fn prefetched_decisions(
+        &self,
+        parent: &Path,
+        candidates: &[String],
+    ) -> Result<Option<HashMap<String, bool>>, CoreError> {
+        let prefetched = self.prefetched.lock().map_err(|_| {
+            CoreError::new(ErrorCode::Unknown, "Indexing prefetch lock was poisoned")
+        })?;
+        let mut decisions = HashMap::with_capacity(candidates.len());
+        let mut git_failed = false;
+        for name in candidates {
+            let key = relative_path(&parent.join(name), &self.root);
+            let excluded = match prefetched.get(&key) {
+                None => return Ok(None),
+                Some(GitAnswer::Kept) => false,
+                Some(GitAnswer::Excluded) => true,
+                Some(GitAnswer::Unavailable) => {
+                    git_failed = true;
+                    false
+                }
+            };
+            decisions.insert(key, excluded);
+        }
+        if git_failed {
+            self.git_failed.store(true, Ordering::Release);
+        }
+        Ok(Some(decisions))
+    }
+
+    /// Answers, ahead of a walk with `rules`, every Git question the walk's
+    /// `prepare_parent` calls would ask, using one `check-ignore` per directory level and
+    /// repository instead of one per directory (Lithe-IDEA#1994). Asking per directory
+    /// took about 2,200 Git processes and 29 s on Kubernetes before gopls could start.
+    ///
+    /// Descends only where a walk can ask: visible, undelegated directories that are
+    /// neither excluded nor covered by a manual or included directory.
+    pub(crate) fn prefetch_git_answers(&self, rules: &VisibilityRules) -> Result<(), CoreError> {
+        if !self.policy.git_ignore_enabled {
+            return Ok(());
+        }
+        let mut scopes = self.prefetched_scopes.lock().map_err(|_| {
+            CoreError::new(ErrorCode::Unknown, "Indexing prefetch lock was poisoned")
+        })?;
+        let scope = PrefetchScope::of(rules);
+        if scopes.contains(&scope) {
+            return Ok(());
+        }
+        let mut frontier = vec![PrefetchDirectory {
+            path: self.root.clone(),
+            repository: self.root.clone(),
+            prefix: String::new(),
+        }];
+        while !frontier.is_empty() {
+            frontier = self.prefetch_level(frontier, rules)?;
+        }
+        scopes.push(scope);
+        Ok(())
+    }
+
+    /// Answers the children of one directory level and returns the next level.
+    fn prefetch_level(
+        &self,
+        frontier: Vec<PrefetchDirectory>,
+        rules: &VisibilityRules,
+    ) -> Result<Vec<PrefetchDirectory>, CoreError> {
+        // The same candidates `prepare_parent` collects, grouped by where Git runs.
+        let mut groups = BTreeMap::<PathBuf, Vec<PrefetchChild>>::new();
+        for directory in frontier {
+            self.check()?;
+            let Ok(entries) = std::fs::read_dir(&directory.path) else {
+                continue;
+            };
+            for entry in entries.filter_map(Result::ok) {
+                if !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                    continue;
+                }
+                let Ok(name) = entry.file_name().into_string() else {
+                    continue;
+                };
+                let path = directory.path.join(&name);
+                let child = PrefetchChild {
+                    key: relative_path(&path, &self.root),
+                    pathspec: format!("{}{name}", directory.prefix),
+                    path,
+                };
+                groups
+                    .entry(directory.repository.clone())
+                    .or_default()
+                    .push(child);
+            }
+        }
+        let mut next = Vec::new();
+        for (repository, children) in groups {
+            let known = self.known_answers(children.iter().map(|child| &child.key))?;
+            let unknown = children
+                .iter()
+                .filter(|child| !known.contains_key(&child.key))
+                .collect::<Vec<_>>();
+            let answers = self.answer_group(&repository, &unknown)?;
+            self.prefetched
+                .lock()
+                .map_err(|_| {
+                    CoreError::new(ErrorCode::Unknown, "Indexing prefetch lock was poisoned")
+                })?
+                .extend(answers.iter().map(|(key, answer)| (key.clone(), *answer)));
+            for child in children {
+                let excluded = match known.get(&child.key) {
+                    Some(excluded) => *excluded,
+                    // An unanswered directory is left to `prepare_parent`, and so is
+                    // everything below it.
+                    None => match answers.get(&child.key) {
+                        Some(answer) => *answer == GitAnswer::Excluded,
+                        None => continue,
+                    },
+                };
+                if excluded || !self.walk_can_ask_below(&child, rules) {
+                    continue;
+                }
+                // A nested repository owns its ignore rules and tracked content.
+                let (repository, prefix) = if child.path.join(".git").exists() {
+                    (child.path.clone(), String::new())
+                } else {
+                    (repository.clone(), format!("{}/", child.pathspec))
+                };
+                next.push(PrefetchDirectory {
+                    path: child.path,
+                    repository,
+                    prefix,
+                });
+            }
+        }
+        Ok(next)
+    }
+
+    /// Whether a walk with `rules` can ask Git about the children of `child`.
+    fn walk_can_ask_below(&self, child: &PrefetchChild, rules: &VisibilityRules) -> bool {
+        let covered = |directories: &[String]| {
+            directories
+                .iter()
+                .any(|directory| contains(directory, &child.key))
+        };
+        !rules.is_hidden(&child.key, true)
+            && !rules.is_delegated(&child.path)
+            && !is_nested_linked_worktree(&child.path)
+            && !covered(&self.policy.manual_excluded_directories)
+            && !covered(&self.policy.included_directories)
+    }
+
+    /// Answers already held for `keys`, from an earlier prefetch or a walk; `true`
+    /// means excluded.
+    fn known_answers<'a>(
+        &self,
+        keys: impl Iterator<Item = &'a String>,
+    ) -> Result<HashMap<String, bool>, CoreError> {
+        let decisions = self.decisions.lock().map_err(|_| {
+            CoreError::new(ErrorCode::Unknown, "Indexing decision lock was poisoned")
+        })?;
+        let prefetched = self.prefetched.lock().map_err(|_| {
+            CoreError::new(ErrorCode::Unknown, "Indexing prefetch lock was poisoned")
+        })?;
+        Ok(keys
+            .filter_map(|key| {
+                let excluded = decisions.get(key).copied().or_else(|| {
+                    prefetched
+                        .get(key)
+                        .map(|answer| *answer == GitAnswer::Excluded)
+                })?;
+                Some((key.clone(), excluded))
+            })
+            .collect())
+    }
+
+    /// Answers `children` of one repository with the same rules as `prepare_parent`,
+    /// keyed by workspace-relative path. Children Git cannot answer reliably are left
+    /// out, so `prepare_parent` asks about them itself.
+    fn answer_group(
+        &self,
+        repository: &Path,
+        children: &[&PrefetchChild],
+    ) -> Result<HashMap<String, GitAnswer>, CoreError> {
+        if children.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let pathspecs = children
+            .iter()
+            .map(|child| child.pathspec.clone())
+            .collect::<Vec<_>>();
+        let Some(ignored) = lithe_git::ignored_paths(repository, &pathspecs)? else {
+            return Ok(children
+                .iter()
+                .map(|child| (child.key.clone(), GitAnswer::Unavailable))
+                .collect());
+        };
+        self.check()?;
+        // Git echoes each ignored pathspec; anything else, such as a differently
+        // normalized Unicode name, cannot be matched to a directory.
+        let requested = pathspecs.iter().collect::<HashSet<_>>();
+        if ignored.iter().any(|path| !requested.contains(path)) {
+            return Ok(HashMap::new());
+        }
+        let mut answers = HashMap::with_capacity(children.len());
+        let mut ignored_children = Vec::new();
+        for child in children {
+            if child.path.join(".git").exists() || !ignored.contains(&child.pathspec) {
+                answers.insert(child.key.clone(), GitAnswer::Kept);
+            } else {
+                ignored_children.push(*child);
+            }
+        }
+        if ignored_children.is_empty() {
+            return Ok(answers);
+        }
+        // The index is authoritative for tracked descendants of an ignored directory.
+        let pathspecs = ignored_children
+            .iter()
+            .map(|child| child.pathspec.clone())
+            .collect::<Vec<_>>();
+        if let Some(tracked) = lithe_git::tracked_directories(repository, &pathspecs)? {
+            for child in ignored_children {
+                let answer = if tracked.contains(&child.pathspec) {
+                    GitAnswer::Kept
+                } else {
+                    GitAnswer::Excluded
+                };
+                answers.insert(child.key.clone(), answer);
+            }
+        }
+        self.check()?;
+        Ok(answers)
     }
 }
 
@@ -1650,6 +1957,117 @@ mod tests {
             !workspace.files().contains(&"晚到目录/hidden.txt".into()),
             "A cached parent must still check a newly created directory"
         );
+    }
+
+    /// Regression for Lithe-IDEA#1994: preparing provider exclusions asked Git once per
+    /// parent directory, which delayed gopls by about 30 s on Kubernetes. A wrapper
+    /// executable counts the Git processes: they must grow with directory depth and the
+    /// number of repositories, not with how many directories exist, and the exclusions
+    /// must stay the native per-directory result.
+    #[cfg(unix)]
+    #[test]
+    fn provider_preparation_asks_git_per_directory_level_not_per_parent() {
+        use std::os::unix::fs::PermissionsExt;
+        let workspace = Workspace::new();
+        workspace.git(&["init", "--quiet"]);
+        fs::write(workspace.0.join(".gitignore"), "generated/\n").unwrap();
+        for package in 0..8 {
+            for module in 0..4 {
+                let module = workspace.0.join(format!("pkg{package}/mod{module}"));
+                fs::create_dir_all(module.join("src/main")).unwrap();
+                fs::create_dir_all(module.join("generated/out")).unwrap();
+                fs::write(module.join("src/main/Main.txt"), "main").unwrap();
+                fs::write(module.join("generated/out/Out.txt"), "out").unwrap();
+            }
+        }
+        // A tracked file keeps its otherwise ignored directory indexed.
+        fs::write(
+            workspace.0.join("pkg0/mod0/generated/Tracked.txt"),
+            "tracked",
+        )
+        .unwrap();
+        workspace.git(&["add", "-f", "pkg0/mod0/generated/Tracked.txt"]);
+        // A nested repository answers with its own ignore rules.
+        let nested = workspace.0.join("pkg1/nested");
+        fs::create_dir_all(nested.join("cache")).unwrap();
+        fs::write(nested.join("cache/Cached.txt"), "cached").unwrap();
+        fs::write(nested.join(".gitignore"), "cache/\n").unwrap();
+        let init = lithe_git::execute_git_readonly(
+            &nested.to_string_lossy(),
+            &["init".into(), "--quiet".into()],
+            None,
+        )
+        .unwrap();
+        assert_eq!(init.exit_code, 0, "{}", init.stderr);
+
+        let trace = crate::test_support::temporary_root("git-trace");
+        fs::create_dir_all(&trace).unwrap();
+        let log = trace.join("calls.log");
+        let wrapper = trace.join("git");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\nfor argument in \"$@\"; do\n  case \"$argument\" in\n    \
+                 check-ignore|ls-files) echo \"$argument\" >> '{}' ;;\n  esac\ndone\n\
+                 exec git \"$@\"\n",
+                log.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        workspace.configure(&[], &[], true);
+        let files = {
+            let _scope = lithe_git::execution_policy::Scope::begin(Some(
+                lithe_git::execution_policy::GitExecutionOptions {
+                    executable: Some(wrapper.to_string_lossy().into_owned()),
+                    ..Default::default()
+                },
+            ))
+            .unwrap();
+            prepare_provider_exclusions(&workspace.0).unwrap().unwrap();
+            // Later walkers of the same generation reuse the decisions.
+            workspace.files()
+        };
+        let calls = fs::read_to_string(&log).unwrap_or_default();
+        let _ = fs::remove_dir_all(&trace);
+
+        let mut expected = (0..8)
+            .flat_map(|package| {
+                (0..4).map(move |module| format!("pkg{package}/mod{module}/generated"))
+            })
+            .filter(|path| path != "pkg0/mod0/generated")
+            .chain(["pkg0/mod0/generated/out".into(), "pkg1/nested/cache".into()])
+            .collect::<Vec<_>>();
+        expected.sort();
+        assert_eq!(excluded_roots(&workspace.0), expected);
+        assert!(files.contains(&"pkg0/mod0/generated/Tracked.txt".into()));
+        assert!(files.contains(&"pkg7/mod3/src/main/Main.txt".into()));
+        assert!(!files.contains(&"pkg7/mod3/generated/out/Out.txt".into()));
+        assert!(!files.contains(&"pkg1/nested/cache/Cached.txt".into()));
+        assert!(!context(&workspace.0)
+            .unwrap()
+            .git_failed
+            .load(Ordering::Acquire));
+
+        // Four directory levels in the outer repository plus one in the nested one; asking
+        // per parent directory took 76 `check-ignore` and 33 `ls-files` processes.
+        let count = |command: &str| calls.lines().filter(|line| *line == command).count();
+        let (check_ignore, ls_files) = (count("check-ignore"), count("ls-files"));
+        assert!(
+            check_ignore <= 5 && ls_files <= 3,
+            "check-ignore ran {check_ignore} times, ls-files {ls_files} times"
+        );
+
+        // Closing the workspace frees the prefetched answers along with the decisions.
+        let policy = context(&workspace.0).unwrap();
+        assert!(!policy.prefetched.lock().unwrap().is_empty());
+        assert!(release(ReleaseIndexingRequest {
+            owner_id: None,
+            root: workspace.0.to_string_lossy().into_owned(),
+            revision: policy.owner_revision,
+        })
+        .unwrap());
+        assert!(policy.prefetched.lock().unwrap().is_empty());
     }
 
     #[test]
