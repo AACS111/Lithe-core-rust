@@ -676,7 +676,7 @@ pub(super) fn worktree_attributes_safe(root: &str, paths: &[String]) -> Result<b
     }
     let fields = output.stdout.split('\0').collect::<Vec<_>>();
     let mut reported = 0;
-    for record in fields.chunks_exact(3) {
+    for record in fields.as_chunks::<3>().0 {
         if record[1] == "filter" || record[1] == "working-tree-encoding" {
             reported += 1;
             if record[2] != "unspecified" && record[2] != "unset" {

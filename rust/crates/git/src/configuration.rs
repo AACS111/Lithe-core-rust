@@ -126,7 +126,7 @@ fn entries(bytes: &[u8]) -> Result<Vec<Entry>, CoreError> {
         ));
     }
     let mut result: Vec<Entry> = Vec::new();
-    for part in parts.chunks_exact(3) {
+    for part in parts.as_chunks::<3>().0 {
         let (key, value) = part[2].split_once('\n').unwrap_or((part[2], "true"));
         let key = key.to_string();
         if !readable(&key) {

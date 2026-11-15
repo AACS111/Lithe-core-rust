@@ -36,7 +36,7 @@ pub(crate) fn resolve(
     model_values: Option<&BTreeMap<String, Vec<String>>>,
 ) -> ResolvedOptions {
     let mut resolved = ResolvedOptions::default();
-    for (id, _) in stored.iter() {
+    for id in stored.keys() {
         if build_system.option(id).is_none() {
             resolved.dropped.push(id.clone());
         }

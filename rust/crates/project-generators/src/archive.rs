@@ -228,18 +228,22 @@ fn is_plain_relative(path: &Path, platform: Platform) -> bool {
         })
 }
 
+/// A directory that is neither a symbolic link nor, on Windows, another
+/// reparse point such as a junction.
 fn real_directory(metadata: &fs::Metadata) -> bool {
-    if !metadata.is_dir() || metadata.file_type().is_symlink() {
-        return false;
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        if metadata.file_attributes() & 0x400 != 0 {
-            return false;
-        }
-    }
-    true
+    metadata.is_dir() && !metadata.file_type().is_symlink() && !reparse_point(metadata)
+}
+
+#[cfg(windows)]
+fn reparse_point(metadata: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    // FILE_ATTRIBUTE_REPARSE_POINT
+    metadata.file_attributes() & 0x400 != 0
+}
+
+#[cfg(not(windows))]
+fn reparse_point(_metadata: &fs::Metadata) -> bool {
+    false
 }
 
 /// Unix stores any name the earlier checks let through. Windows needs valid

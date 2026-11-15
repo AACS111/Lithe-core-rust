@@ -871,7 +871,7 @@ fn gradle_canonical_outputs_are_read_from_the_output_file() {
                 "format": "litheBuildModel",
                 "version": 0,
                 "projects": [
-                    { "path": format!("{root}"), "name": "shop", "properties": { "taskPrefix": ":" } },
+                    { "path": root.to_string(), "name": "shop", "properties": { "taskPrefix": ":" } },
                     { "path": "app", "name": "app", "properties": { "taskPrefix": ":app:" } }
                 ],
                 "tasks": [

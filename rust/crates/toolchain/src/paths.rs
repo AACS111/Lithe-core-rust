@@ -23,7 +23,9 @@ pub fn normalize(path: &str, platform: &str, case_sensitive: bool) -> Option<Str
             && bytes[2] == b'/'
         {
             (text[..3].to_owned(), &text[3..])
-        } else if let Some(unc) = text.strip_prefix("//") {
+        } else {
+            // Anything else must be a UNC path: `//server/share/...`.
+            let unc = text.strip_prefix("//")?;
             let mut components = unc.splitn(3, '/');
             let server = components.next()?;
             let share = components.next()?;
@@ -40,8 +42,6 @@ pub fn normalize(path: &str, platform: &str, case_sensitive: bool) -> Option<Str
                 format!("//{server}/{share}/"),
                 components.next().unwrap_or(""),
             )
-        } else {
-            return None;
         }
     } else {
         ("/".to_owned(), text.strip_prefix('/')?)
