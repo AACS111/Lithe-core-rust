@@ -6,6 +6,11 @@ license = "Apache-2.0"
 publish = false
 description = "Tests that need a real Windows or Unix host, and the fixture program they start"
 
+# The crate exists to run on each host: CI tests it on macOS and Windows as
+# well as Linux (scripts/rust-core/affected-crates.mjs).
+[package.metadata.lithe-ci]
+hosts = ["macos", "windows"]
+
 [dev-dependencies]
 lithe-git-host = { path = "../git-host" }
 lithe-lsp-transport = { path = "../lsp-transport" }
