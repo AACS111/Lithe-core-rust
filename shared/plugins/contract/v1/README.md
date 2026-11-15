@@ -483,8 +483,10 @@ declarative plugin writes no logging code. Each start of a `languageServers[]` o
 `debugAdapters[]` entry is one `languageServer/start` or `debugAdapter/start`
 operation, from launch resolution until `initialize` succeeds. Each run of a
 `buildSystems[]` model or dependencies command source is one `lithe/build/model` or
-`lithe/build/dependencies` operation, using the SDK request names. A failure
-carries one `code`:
+`lithe/build/dependencies` operation, using the SDK request names. Each
+installation of a [command installer](#command-installers) the user confirmed is
+one `commandInstaller/install` operation, from planning the chosen target until
+every provided command is in its directory. A failure carries one `code`:
 
 | Code | Meaning |
 | --- | --- |
@@ -494,8 +496,8 @@ carries one `code`:
 | `host.initializeFailed` | A started server or adapter failed its `initialize` handshake |
 | `host.timedOut` | The attempt exceeded its deadline |
 | `host.exitedEarly` | A server or adapter exited before `initialize` succeeded |
-| `host.commandFailed` | A build command exited unsuccessfully |
-| `host.outputInvalid` | A build command's output is not a valid document |
+| `host.commandFailed` | A build command or an installation exited unsuccessfully |
+| `host.outputInvalid` | A build command's output is not a valid document, or an installation that exited successfully did not provide its commands |
 
 User cancellation and superseded attempts record nothing. Plugin output, paths,
 and error text never appear in these facts. The executing owner and the

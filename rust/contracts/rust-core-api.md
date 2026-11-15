@@ -6026,6 +6026,7 @@ a code has one meaning across every contribution with that lifecycle:
 | `debugAdapter/start` | `debugAdapters[]` | process start |
 | `lithe/build/model` | `buildSystems[].model` command source | command run |
 | `lithe/build/dependencies` | `buildSystems[].dependencies` command source | command run |
+| `commandInstaller/install` | `commandInstallers[]` installation the user confirmed; `decode` when a provided command is missing after a successful exit | command run |
 
 | `stage` | Process start | Command run |
 | --- | --- | --- |

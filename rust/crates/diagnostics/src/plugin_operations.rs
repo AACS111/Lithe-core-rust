@@ -111,6 +111,14 @@ pub static BUILD_DEPENDENCIES: Contribution = Contribution {
     lifecycle: Lifecycle::CommandRun,
 };
 
+/// `commandInstallers[]`: one installation the user confirmed, from planning the
+/// chosen target to finding every provided command in its directory. A command
+/// still missing after a successful exit is the `decode` stage.
+pub static COMMAND_INSTALLER_INSTALL: Contribution = Contribution {
+    operation: "commandInstaller/install",
+    lifecycle: Lifecycle::CommandRun,
+};
+
 /// Every contribution kind this ingress accepts. Supporting a new declarative
 /// contract means adding its row here and reporting the same token from its owner.
 pub static CONTRIBUTIONS: &[&Contribution] = &[
@@ -118,6 +126,7 @@ pub static CONTRIBUTIONS: &[&Contribution] = &[
     &DEBUG_ADAPTER_START,
     &BUILD_MODEL,
     &BUILD_DEPENDENCIES,
+    &COMMAND_INSTALLER_INSTALL,
 ];
 
 impl Contribution {
@@ -430,6 +439,7 @@ mod tests {
             ("debugAdapter/start", Lifecycle::ProcessStart),
             ("lithe/build/model", Lifecycle::CommandRun),
             ("lithe/build/dependencies", Lifecycle::CommandRun),
+            ("commandInstaller/install", Lifecycle::CommandRun),
         ];
         let rows: Vec<_> = CONTRIBUTIONS
             .iter()
