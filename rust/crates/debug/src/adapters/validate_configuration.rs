@@ -69,7 +69,7 @@ impl DebugConfiguration {
             (
                 "program",
                 &bindings.program,
-                &["target.path", TARGET_EXECUTABLE][..],
+                &["target.path", TARGET_DIRECTORY, TARGET_EXECUTABLE][..],
             ),
             ("processId", &bindings.process_id, &["target.processID"][..]),
             ("cwd", &bindings.cwd, &["target.workingDirectory"][..]),

@@ -1,0 +1,614 @@
+{
+  "schemaVersion": 1,
+  "description": "debug.adapters.readAnnouncement: one output line of a tcpAnnounced debug adapter and what Core reads from it. A case without result fails with invalid_request.",
+  "cases": [
+    {
+      "name": "an IPv4 loopback host and port",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 127.0.0.1:54321"
+      },
+      "result": {
+        "status": "announced",
+        "host": "127.0.0.1",
+        "port": 54321
+      }
+    },
+    {
+      "name": "trailing carriage return and spaces",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 127.0.0.1:5678 \r"
+      },
+      "result": {
+        "status": "announced",
+        "host": "127.0.0.1",
+        "port": 5678
+      }
+    },
+    {
+      "name": "text before the prefix",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "2026-11-15T10:00:00Z DAP server listening at: 127.0.0.1:5678"
+      },
+      "result": {
+        "status": "announced",
+        "host": "127.0.0.1",
+        "port": 5678
+      }
+    },
+    {
+      "name": "a bracketed IPv6 loopback address",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: [::1]:5678"
+      },
+      "result": {
+        "status": "announced",
+        "host": "::1",
+        "port": 5678
+      }
+    },
+    {
+      "name": "localhost",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: localhost:5678"
+      },
+      "result": {
+        "status": "announced",
+        "host": "localhost",
+        "port": 5678
+      }
+    },
+    {
+      "name": "another loopback IPv4 address",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 127.1.2.3:1"
+      },
+      "result": {
+        "status": "announced",
+        "host": "127.1.2.3",
+        "port": 1
+      }
+    },
+    {
+      "name": "the first occurrence of the prefix",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: DAP server listening at: 127.0.0.1:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "a line without the prefix",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "Type 'dlv help' for list of commands."
+      },
+      "result": {
+        "status": "none"
+      }
+    },
+    {
+      "name": "the prefix on the other stream",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stderr",
+        "line": "DAP server listening at: 127.0.0.1:5678"
+      },
+      "result": {
+        "status": "none"
+      }
+    },
+    {
+      "name": "an empty line",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": ""
+      },
+      "result": {
+        "status": "none"
+      }
+    },
+    {
+      "name": "a remote IPv4 host",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 10.0.0.5:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "notLoopback"
+      }
+    },
+    {
+      "name": "the unspecified address",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 0.0.0.0:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "notLoopback"
+      }
+    },
+    {
+      "name": "a remote name",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: debug.example.org:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "notLoopback"
+      }
+    },
+    {
+      "name": "an IPv4-mapped IPv6 address",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: [::ffff:127.0.0.1]:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "notLoopback"
+      }
+    },
+    {
+      "name": "an unbracketed IPv6 address",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: ::1:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "a bracketed IPv4 address",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: [127.0.0.1]:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "an IPv6 zone",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: [fe80::1%en0]:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "no port",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 127.0.0.1"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "port zero",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 127.0.0.1:0"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "a port above 65535",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 127.0.0.1:65536"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "a signed port",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 127.0.0.1:+5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "text after the port",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: 127.0.0.1:5678 (pid 42)"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "a scheme",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: tcp://127.0.0.1:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "credentials",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: user@127.0.0.1:5678"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "nothing after the prefix",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "DAP server listening at: "
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "a port alone",
+      "input": {
+        "endpoint": {
+          "stream": "stderr",
+          "prefix": "Listening on port ",
+          "value": "port"
+        },
+        "stream": "stderr",
+        "line": "Listening on port 4711"
+      },
+      "result": {
+        "status": "announced",
+        "host": "127.0.0.1",
+        "port": 4711
+      }
+    },
+    {
+      "name": "a port with surrounding spaces",
+      "input": {
+        "endpoint": {
+          "stream": "stderr",
+          "prefix": "Listening on port ",
+          "value": "port"
+        },
+        "stream": "stderr",
+        "line": "Listening on port  4711  "
+      },
+      "result": {
+        "status": "announced",
+        "host": "127.0.0.1",
+        "port": 4711
+      }
+    },
+    {
+      "name": "a port with leading zeros",
+      "input": {
+        "endpoint": {
+          "stream": "stderr",
+          "prefix": "Listening on port ",
+          "value": "port"
+        },
+        "stream": "stderr",
+        "line": "Listening on port 04711"
+      },
+      "result": {
+        "status": "announced",
+        "host": "127.0.0.1",
+        "port": 4711
+      }
+    },
+    {
+      "name": "six digits",
+      "input": {
+        "endpoint": {
+          "stream": "stderr",
+          "prefix": "Listening on port ",
+          "value": "port"
+        },
+        "stream": "stderr",
+        "line": "Listening on port 000001"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "a host where a port is expected",
+      "input": {
+        "endpoint": {
+          "stream": "stderr",
+          "prefix": "Listening on port ",
+          "value": "port"
+        },
+        "stream": "stderr",
+        "line": "Listening on port 127.0.0.1:4711"
+      },
+      "result": {
+        "status": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "a port line on the other stream",
+      "input": {
+        "endpoint": {
+          "stream": "stderr",
+          "prefix": "Listening on port ",
+          "value": "port"
+        },
+        "stream": "stdout",
+        "line": "Listening on port 4711"
+      },
+      "result": {
+        "status": "none"
+      }
+    },
+    {
+      "name": "an unknown stream",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "console",
+        "line": "DAP server listening at: 127.0.0.1:5678"
+      }
+    },
+    {
+      "name": "an endpoint without a prefix",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "value": "port"
+        },
+        "stream": "stdout",
+        "line": "4711"
+      }
+    },
+    {
+      "name": "an empty prefix",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "",
+          "value": "port"
+        },
+        "stream": "stdout",
+        "line": "4711"
+      }
+    },
+    {
+      "name": "a multi-line prefix",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "port\n",
+          "value": "port"
+        },
+        "stream": "stdout",
+        "line": "port\n4711"
+      }
+    },
+    {
+      "name": "an unknown value",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "port ",
+          "value": "url"
+        },
+        "stream": "stdout",
+        "line": "port 4711"
+      }
+    },
+    {
+      "name": "a fixed-port endpoint",
+      "input": {
+        "endpoint": {
+          "port": 4711
+        },
+        "stream": "stdout",
+        "line": "port 4711"
+      }
+    },
+    {
+      "name": "a language server endpoint",
+      "input": {
+        "endpoint": {
+          "languageID": "go",
+          "command": "start",
+          "stream": "stdout",
+          "prefix": "port ",
+          "value": "port"
+        },
+        "stream": "stdout",
+        "line": "port 4711"
+      }
+    },
+    {
+      "name": "no line",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout"
+      }
+    },
+    {
+      "name": "an unknown field",
+      "input": {
+        "endpoint": {
+          "stream": "stdout",
+          "prefix": "DAP server listening at: ",
+          "value": "hostPort"
+        },
+        "stream": "stdout",
+        "line": "",
+        "pid": 1
+      }
+    }
+  ]
+}

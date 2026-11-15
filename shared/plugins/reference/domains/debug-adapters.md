@@ -34,7 +34,7 @@
 | `tcpPort` | 固定端口 `endpoint.port` | 是 |
 | `tcpLanguageServer` | 同一插件的语言服务器：`endpoint` 带 `languageID` 和 `command`；宿主每次会话发 `workspace/executeCommand`，服务器回答回环端口 | 否，且不能有 |
 
-所有 TCP 端点只能是本机回环地址。`tcpLanguageServer` 的命令是安装和更新审查的一部分，命令改变时会重新询问用户。
+所有 TCP 端点只能是本机回环地址。`tcpAnnounced` 的适配器在 `stream` 上打印的第一行含 `prefix` 的输出就是公告：前缀之后、去掉首尾空白的部分必须是 1 到 65535 的端口（`port`，连 `127.0.0.1`），或带回环主机的 `host:port`（`hostPort`，IPv6 加方括号，例如 Delve 的 `DAP server listening at: 127.0.0.1:54321`）。公告不合法，或 10 秒内没有公告，启动失败；其余输出进调试控制台。`tcpLanguageServer` 的命令是安装和更新审查的一部分，命令改变时会重新询问用户。
 
 ### 适配器行为
 
@@ -54,7 +54,7 @@
 
 | 声明 | 说明 |
 | --- | --- |
-| `configurations.launch`、`configurations.attach` | 默认 DAP `arguments`、包内的 `parametersSchema` 和 `targetBindings`：`program` ← `target.path`、`processId` ← `target.processID`、`cwd` ← `target.workingDirectory`，以及有界的 `args` ← `target.arguments`、`env` ← `target.environment`；只有 `attach` 能绑定 `connection`。为未声明的请求写配置会被拒绝 |
+| `configurations.launch`、`configurations.attach` | 默认 DAP `arguments`、包内的 `parametersSchema` 和 `targetBindings`：`program` ← `target.path`（或 ← `target.directory`，即 `target.path` 所在目录，供 Delve 这类按包调试的适配器使用）、`processId` ← `target.processID`、`cwd` ← `target.workingDirectory`，以及有界的 `args` ← `target.arguments`、`env` ← `target.environment`；只有 `attach` 能绑定 `connection`。为未声明的请求写配置会被拒绝 |
 | `configurations.launch.executable` | 目标是适配器不能直接调试的源文件（C、C++、Swift）时：`setting` 指向插件的 `file` 设置，最多 8 个 `candidates[]`（以 `${workspaceFolder}/` 或 `${fileDirectory}/` 开头，不含 `..`）是用户没选时宿主查找的路径。必须与 `targetBindings.program: "target.executable"` 一起声明。用户在设置里选的路径永远优先，不是可运行文件就报错，不会改试候选 |
 | `capabilities.disabled` | 宿主视为不存在的标准 DAP `supports*` 名称或 `exceptionBreakpointFilters` |
 | `console.commandPrefix` | 1–8 个字符、不含空格的文本（lldb-dap 用反引号），适配器控制台把它读作“后面是调试器命令”；宿主只在请求补全时把它放在输入行前面，并把适配器的回答移回来，用户看不到 |
@@ -172,7 +172,7 @@ A plugin declares the debug adapters it implements in `debugAdapters[]`. Each ad
 | `tcpPort` | A fixed `endpoint.port` | Yes |
 | `tcpLanguageServer` | A language server of the same plugin: `endpoint` has `languageID` and `command`; for each session the host sends `workspace/executeCommand` and the server answers a loopback port | No, and it must not have one |
 
-Every TCP endpoint is loopback only. The `tcpLanguageServer` command is part of the install and update review, and changing it asks the user again.
+Every TCP endpoint is loopback only. A `tcpAnnounced` adapter's announcement is the first line on `stream` that contains `prefix`: the rest of that line after the prefix, without surrounding whitespace, must be a port from 1 to 65535 (`port`, on `127.0.0.1`) or `host:port` with a loopback host, IPv6 in brackets (`hostPort`, for example Delve's `DAP server listening at: 127.0.0.1:54321`). An invalid announcement, or none within 10 seconds, fails the start; the rest of the output goes to the Debug Console. The `tcpLanguageServer` command is part of the install and update review, and changing it asks the user again.
 
 ### Adapter behavior
 
@@ -192,7 +192,7 @@ Names (`request`, `event`, fields, `argument`) are a letter followed by up to 63
 
 | Declaration | Notes |
 | --- | --- |
-| `configurations.launch`, `configurations.attach` | Default DAP `arguments`, a packaged `parametersSchema`, and `targetBindings`: `program` ← `target.path`, `processId` ← `target.processID`, `cwd` ← `target.workingDirectory`, plus bounded `args` ← `target.arguments` and `env` ← `target.environment`; only `attach` may bind `connection`. A configuration for an undeclared request is refused |
+| `configurations.launch`, `configurations.attach` | Default DAP `arguments`, a packaged `parametersSchema`, and `targetBindings`: `program` ← `target.path` (or ← `target.directory`, the directory containing `target.path`, for an adapter that debugs a package such as Delve), `processId` ← `target.processID`, `cwd` ← `target.workingDirectory`, plus bounded `args` ← `target.arguments` and `env` ← `target.environment`; only `attach` may bind `connection`. A configuration for an undeclared request is refused |
 | `configurations.launch.executable` | For a target that is a source file the adapter cannot debug directly (C, C++, Swift): `setting` names a `file` setting of the plugin, and up to 8 `candidates[]` (starting with `${workspaceFolder}/` or `${fileDirectory}/`, no `..`) are the paths the host looks for when the user chose nothing. Declare it together with `targetBindings.program: "target.executable"`. The path the user chose in the setting always wins: if it is not a runnable file that is an error, and the candidates are not tried instead |
 | `capabilities.disabled` | Standard DAP `supports*` names or `exceptionBreakpointFilters` the host treats as absent |
 | `console.commandPrefix` | Text of 1–8 characters without spaces (a backtick for lldb-dap) that the adapter's console reads as "what follows is a debugger command"; the host puts it before the typed line only when asking for completions and moves the adapter's answer back, so the user never sees it |

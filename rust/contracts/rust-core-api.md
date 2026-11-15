@@ -445,6 +445,7 @@ or removing a command fails until the table changes in the same commit.
 | `debug.adapters.startArguments` | Check one debug start against a plugin's `debugAdapters[]` entry and return its DAP launch arguments |
 | `debug.validateAdapterEndpoint` | Validate an IDE-to-DAP TCP endpoint and classify whether remote consent is required; performs no DNS or network I/O |
 | `debug.adapters.executablePlan` | Say where to look for the program a launch debugs: the user's setting and the adapter's candidate paths |
+| `debug.adapters.readAnnouncement` | Read whether one output line of a `tcpAnnounced` adapter announces its endpoint, and accept only a loopback one; reads no process output and opens no socket |
 | `debug.transport.policy` | Return the default byte-stream deadlines, queue budgets and the session `initialize` deadline; creates no state |
 | `debug.transport.handle` | Apply one platform event to an IDE-to-adapter byte-stream lifecycle and return the effects the platform runs next |
 | `debug.transport.release` | Forget the lifecycle of a stopped byte stream once the platform dropped its handles |
@@ -2384,7 +2385,8 @@ bounded best-effort drain of queued frames (including disconnect) for up to one
 second before closing; this is local write completion, not a remote acknowledgement.
 Failure and explicit transport abort close immediately. There is no automatic reconnect or request
 replay. Proxy/tunnel implementations and plugin `tcpPort` / `tcpAnnounced`
-process hosting are not enabled by this API.
+process hosting are not enabled by this API; `tcpAnnounced` hosting reads its
+endpoint through `debug.adapters.readAnnouncement`.
 
 The `debug.transport.*` commands hold the lifecycle rules of that byte stream
 so every platform network layer shares one rule set. They are separate from the
@@ -4055,9 +4057,27 @@ only `launch: { kind: "backend", function, timeoutMilliseconds }` with empty
 `requiredDirectories` and no `resolveParams`: the server's own session asks
 the backend with the directories of its start, so resolving the adapter needs
 no `workspaceStateDirectory`, `logDirectory` or `temporaryDirectory`. Core validates every declared
-`transport`, but a host starts only the transports it implements: the macOS host
-runs `stdio` and refuses `tcpPort` and `tcpAnnounced` before starting the
-process, with `plugin.launch.unsupportedTransport`.
+`transport`, but a host starts only the transports it implements and refuses
+the others before starting the process, with `plugin.launch.unsupportedTransport`.
+
+`debug.adapters.readAnnouncement` accepts exactly `{ endpoint, stream, line }`:
+the plan's `debugAdapter.endpoint` of a `tcpAnnounced` adapter (`stream`,
+`prefix`, `value`), the stream one line of the adapter's output came from
+(`stdout` or `stderr`), and that line without its line break. A line on another
+stream, or without the prefix, returns `{ status: "none" }`. Otherwise the line
+is the announcement: the rest after the prefix's first occurrence, without
+surrounding whitespace, returns `{ status: "announced", host, port }` when it is
+a port from 1 to 65535 in decimal digits (`value: "port"`, host `127.0.0.1`) or
+`host:port` / `[ipv6]:port` with a loopback host (`value: "hostPort"`; host as
+written, without brackets). It returns `{ status: "invalid", reason:
+"malformed" }` for any other text and `{ status: "invalid", reason:
+"notLoopback" }` for a well-formed host that is not `localhost`, 127.0.0.0/8 or
+`::1`. An endpoint that is not a valid `tcpAnnounced` endpoint, an unknown
+stream or field fails with `invalid_request`. The host feeds the declared
+stream to this command from the transport's `discoverEndpoint` effect until an
+answer other than `none`, then reports `endpointResolved` for `announced` or
+fails with `invalidEndpoint`; the discovery deadline bounds the wait. Cases
+live in `rust/fixtures/debug/adapter-announcements-v1.json`.
 
 `debug.adapters.startArguments` accepts `{ manifest, adapterID, request:
 "launch" | "attach", facts: { registration: { generation, currentGeneration },
@@ -4069,7 +4089,10 @@ configuration already sets it. `configuration` is a plugin backend's own DAP
 arguments from `lithe/host/debug/start`, as `debug.decodeBackendConfiguration`
 returned them; each of its keys replaces the argument of the same name, so the
 host sends `arguments` to the adapter unchanged. A `noDebug` or `__` key there is
-refused with `plugin.debug.invalidStart` and `field: "configuration.<key>"`. `program` is filled from `target.path`, or from
+refused with `plugin.debug.invalidStart` and `field: "configuration.<key>"`. `program` is filled from `target.path`; from the directory
+containing `target.path` when the configuration binds it to `target.directory`
+(an adapter such as Delve that builds a package; a path without a directory is
+`debug.target.invalid` with `field: "target.path"`); or from
 `target.executable` (an absolute path the host found) when the configuration
 binds it to `target.executable`. Refusals use the `rejected` shape with
 `debug.provider.stale`, `debug.request.unsupported`, `debug.runtime.stale`, or

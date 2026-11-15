@@ -129,6 +129,12 @@
 
 ## 时间线（新的在上）
 
+### 2026-11-15
+
+| PR | 修改人 | API 编号 | 协议 / 能力 | 改了什么 |
+| --- | --- | --- | --- | --- |
+| [#PRNUM](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/PRNUM) | [@xiaoyumuxi](https://github.com/xiaoyumuxi) | API-30 | `debugAdapters` 0 内的补充 | `targetBindings.program` 新增来源 `target.directory`：`target.path` 所在的目录，供 Delve 这类按包构建再调试的适配器使用；路径没有所在目录时以 `debug.target.invalid`（字段 `target.path`）拒绝。新增宿主命令 `debug.adapters.readAnnouncement`，宿主把 `tcpAnnounced` 适配器的输出逐行交给它，第一行含 `prefix` 的输出是公告，前缀之后是 `port`（连 `127.0.0.1`）或带回环主机的 `host:port`，返回 `none`、`announced` 或 `invalid`（`malformed`、`notLoopback`）；契约写明宿主怎样读公告、10 秒内没有公告就启动失败。清单格式只多了一个枚举值，不需要新能力版本。 |
+
 ### 2026-11-14
 
 | PR | 修改人 | API 编号 | 协议 / 能力 | 改了什么 |

@@ -15,6 +15,12 @@ pub(super) fn dispatch(command: DebugCommand, id: Option<String>, payload: Value
                 Err(error) => CoreResponse::failure(id, error),
             }
         }
+        DebugCommand::AdaptersReadAnnouncement => {
+            match crate::debug::adapters::read_announcement(payload) {
+                Ok(data) => CoreResponse::success(id, data),
+                Err(error) => CoreResponse::failure(id, error),
+            }
+        }
         DebugCommand::TransportPolicy => match crate::debug::transport_policy(payload) {
             Ok(data) => CoreResponse::success(id, data),
             Err(error) => CoreResponse::failure(id, error),

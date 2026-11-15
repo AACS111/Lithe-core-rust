@@ -281,6 +281,9 @@ pub enum DebugCommand {
     ValidateAdapterEndpoint,
     /// Says where to look for the program a launch debugs (`debug.adapters.executablePlan`).
     AdaptersExecutablePlan,
+    /// Reads whether one output line of a `tcpAnnounced` adapter announces its
+    /// loopback endpoint (`debug.adapters.readAnnouncement`).
+    AdaptersReadAnnouncement,
     /// Returns the default byte-stream deadlines and queue budgets (`debug.transport.policy`).
     TransportPolicy,
     /// Applies one platform event to a byte-stream lifecycle and returns the effects to run
@@ -1003,6 +1006,9 @@ impl CoreCommand {
             "debug.adapters.executablePlan" => {
                 Some(Self::Debug(DebugCommand::AdaptersExecutablePlan))
             }
+            "debug.adapters.readAnnouncement" => {
+                Some(Self::Debug(DebugCommand::AdaptersReadAnnouncement))
+            }
             "debug.transport.policy" => Some(Self::Debug(DebugCommand::TransportPolicy)),
             "debug.transport.handle" => Some(Self::Debug(DebugCommand::TransportHandle)),
             "debug.transport.release" => Some(Self::Debug(DebugCommand::TransportRelease)),
@@ -1668,6 +1674,7 @@ mod tests {
             "debug.transport.policy",
             "debug.transport.handle",
             "debug.transport.release",
+            "debug.adapters.readAnnouncement",
         ] {
             assert!(CoreCommand::parse(command).is_some(), "missing {command}");
         }

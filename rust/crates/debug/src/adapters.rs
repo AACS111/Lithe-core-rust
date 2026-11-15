@@ -1,5 +1,5 @@
-//! `debugAdapters[]` of an API level 4 plugin manifest: what a host must know
-//! about a debug adapter before starting any process for it.
+//! `debugAdapters[]` of a plugin manifest: what a host must know about a
+//! debug adapter before starting any process for it.
 //!
 //! A declaration names the adapter, how its process is started and reached
 //! (stdio, a loopback TCP endpoint, or a port the plugin's own language server
@@ -26,6 +26,7 @@ use serde_json::{json, Map, Value};
 use std::collections::{BTreeSet, HashSet};
 use std::net::IpAddr;
 
+mod announcement;
 mod checks;
 mod declaration;
 mod plan;
@@ -36,6 +37,7 @@ mod validate_adapter;
 mod validate_configuration;
 mod validate_launch;
 
+pub use announcement::*;
 pub(crate) use checks::*;
 pub use declaration::*;
 pub use plan::*;
@@ -86,6 +88,10 @@ const MAX_EXECUTABLE_CANDIDATE: usize = 1024;
 /// The `targetBindings.program` source that reads the executable the host
 /// resolved, instead of the target's own path.
 const TARGET_EXECUTABLE: &str = "target.executable";
+
+/// The `targetBindings.program` source that reads the directory containing the
+/// target's path, for adapters that debug a package rather than one file.
+const TARGET_DIRECTORY: &str = "target.directory";
 
 /// The target kind of a remote `host:port` the debuggee listens on.
 const TARGET_CONNECTION: &str = "connection";

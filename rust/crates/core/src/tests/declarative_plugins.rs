@@ -2050,6 +2050,35 @@ fn debug_start_arguments_need_an_absolute_resolved_executable() {
 }
 
 #[test]
+fn debug_start_arguments_bind_program_to_the_directory_of_the_target() {
+    // The host sends native paths, and the directory depends on the platform.
+    let (path, directory) = if cfg!(windows) {
+        (r"C:\work\cmd\app\main.go", r"C:\work\cmd\app")
+    } else {
+        ("/work/cmd/app/main.go", "/work/cmd/app")
+    };
+    let mut manifest = fixture("debug-adapter.plugin.json");
+    manifest["debugAdapters"][0]["configurations"]["launch"]["targetBindings"]["program"] =
+        json!("target.directory");
+    let launch = lithe_plugin_manifest::debug_start_arguments_command(json!({
+        "manifest": manifest,
+        "adapterID": "example",
+        "request": "launch",
+        "facts": {
+            "registration": { "generation": 3, "currentGeneration": 3 },
+            "target": { "kind": "file", "path": path, "workingDirectory": "/work" },
+        },
+    }))
+    .expect("payload is well formed");
+    assert_eq!(launch["status"], "ok", "{launch}");
+    // A package debugger builds every file of the directory, not one file.
+    assert_eq!(
+        launch["arguments"],
+        json!({ "stopOnEntry": false, "program": directory, "cwd": "/work" })
+    );
+}
+
+#[test]
 fn debug_executable_plan_lists_the_configured_path_and_ordered_candidates() {
     let plan = debug_executable_plan(
         "native",

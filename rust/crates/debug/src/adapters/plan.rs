@@ -111,6 +111,9 @@ pub fn plan(
         {
             return Err(missing("target.path", "path"));
         }
+        Some(TARGET_DIRECTORY) if target.path.as_deref().and_then(target_directory).is_none() => {
+            return Err(missing("target.path", "path inside a directory"));
+        }
         _ => {}
     }
     if bindings.args.is_some()

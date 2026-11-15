@@ -144,7 +144,8 @@ pub struct DebugTargetBindings {
     /// Source of the `env` argument: only `target.environment`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub env: Option<String>,
-    /// Source of the `program` argument: `target.path` or `target.executable`. Launch only.
+    /// Source of the `program` argument: `target.path`, `target.directory` (the
+    /// directory containing `target.path`) or `target.executable`. Launch only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub program: Option<String>,
     /// Source of the `processId` argument: only `target.processID`. Attach only.

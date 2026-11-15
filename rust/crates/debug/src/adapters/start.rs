@@ -151,6 +151,11 @@ fn bound_arguments(
     };
     let program = match bindings.program.as_deref() {
         Some(TARGET_EXECUTABLE) => target.executable.clone(),
+        Some(TARGET_DIRECTORY) => target
+            .path
+            .as_deref()
+            .and_then(target_directory)
+            .map(str::to_string),
         _ => target.path.clone(),
     };
     bind("program", &bindings.program, program.map(Value::from));
@@ -182,6 +187,15 @@ fn bound_arguments(
         arguments,
         connection,
     })
+}
+
+/// The directory that contains a target path, or `None` when the path names
+/// no directory, for example a bare file name.
+pub(crate) fn target_directory(path: &str) -> Option<&str> {
+    std::path::Path::new(path)
+        .parent()
+        .and_then(std::path::Path::to_str)
+        .filter(|directory| !directory.is_empty())
 }
 
 /// Writes the target's endpoint, and its path mappings when the adapter takes
