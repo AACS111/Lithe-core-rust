@@ -82,6 +82,9 @@
 - 桌面写入器（`desktop/internal/logstore` 的 `Store`）在详细诊断状态变化时调用 `configureCoreEvents`，只在开关变化时发送；调用失败时记录一次 `app.logging.diagnostics_failed`，直到想要的状态再次变化前不重试。
 - 写入器在每次写入批次、flush 和退出时排空一次。没有其他宿主活动时，由 Core 的唤醒回调安排排空：drain 之后的第一条事实或第一次丢弃计数触发一次回调，同一个 drain 周期内的后续变化合并。Core 每个进程只有一个唤醒回调，所以只有 `cmd/lithe` 创建的应用写入器调用 `Store.ObserveCoreFacts()` 安装它；回调只唤醒写入器，复用宿主事件已有的 100 毫秒合并排空；`Close` 先移除回调，再做最后一次排空。回调不得重入 Core。不得为 Core 队列增加空闲轮询或独立写入器。
 - 排空得到的 Core 事实与宿主事件进入同一批编码：保留 `ts`、`op` 和 Core 给出的通道，由写入器分配 `seq`，以 `validateCatalog: true` 写入。排空本身失败只计入写入失败数。
+- Core 的 panic 记为 `app.core.panic_interrupted`（ERROR），由 `rust/crates/core/src/runtime/panic_facts.rs` 安装的 panic hook 在展开开始前记录。每个 Core 命令和直接 IDE/AskPass 入口经 `helper_failures::install` 安装一次，新 hook 排在原 hook 前面，原来的 stderr 报告保留。hook 可能运行在持有队列锁的线程上，所以用 `core_events::record_without_waiting`：有限次 `try_lock` 拿不到锁就放弃这条事实，不等待，也不在 hook 里再次 panic（hook 内的 panic 会直接 abort）。`boundary` 为 `request` 表示请求分发中的 panic，同时记录 `method`（不符合 token 形状时省略）和当前请求的 op；为 `thread` 表示 Core 自己启动的线程中的 panic，该线程照常展开，由线程的所有者决定后续。`location` 是 `文件:行:列`，`panic` 是文本载荷，非文本载荷记为固定说明。
+- 宿主恢复的 Go panic 记为 `app.runtime.panic_interrupted`（ERROR）。Viva 的平台回调、Core 的唤醒回调和请求事件观察者在 recover 的地方把 panic 交给写入器的 `Store.RecordPanic`：它不加锁、不阻塞、不调用 Core，`Close` 已经开始时记录的 panic 也会进入最后一次排空。`boundary` 是 `viva:` 加 Viva 报告的边界，或 `core:log-waker`、`core:events-observer`；`stack` 只保留 panic 调用之后的帧，每帧写成“函数 文件基名:行”。窗口循环因恢复的 panic 以外的错误结束时，记 `app.window.loop_failed`。
+- Go 运行时的致命崩溃（没有恢复的 panic、`fatal error`）经 `debug.SetCrashOutput` 写进默认日志目录下的 `.crash/<会话名>`，只有应用写入器调用 `Store.CaptureCrashes()` 开启。下次启动认领上一次留下的文件：有内容记 `app.session.previous_interrupted`（ERROR），空文件说明进程被强制结束或在 Go 运行时之外崩溃，记 `app.session.close_missing`（WARN）；正常 `Close` 删除本会话的文件。创建本会话的文件、认领旧文件或 `Close` 删除本会话的文件失败，记 `app.session.crash_capture_failed`，`stage` 分别是 `create`、`claim`、`release`。
 
 ## 七、引擎宿主
 

@@ -3,6 +3,7 @@
 mod dispatcher;
 mod ffi;
 pub(crate) mod helper_failures;
+pub(crate) mod panic_facts;
 pub(crate) mod request_trace;
 
 pub(crate) use dispatcher::execute_json;

@@ -22,6 +22,15 @@ pub fn current() -> Context {
     CURRENT.with(|current| current.borrow().clone())
 }
 
+/// [`current`] for a panic hook: `None` instead of a second panic when the
+/// thread is being torn down or the panic struck while the context was borrowed.
+pub fn try_current() -> Option<Context> {
+    CURRENT
+        .try_with(|current| current.try_borrow().ok().map(|context| context.clone()))
+        .ok()
+        .flatten()
+}
+
 /// Makes `context` the running request's correlation and returns the enclosing
 /// one, which the caller restores with another `replace` when its request ends.
 pub fn replace(context: Context) -> Context {

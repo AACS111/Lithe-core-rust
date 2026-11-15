@@ -122,6 +122,64 @@ pub fn record(
     Ok(())
 }
 
+/// Records like [`record`], but never waits for a lock. A panic hook runs on a
+/// thread that may already hold the queue or waker lock, and waiting there
+/// would hang the process instead of reporting the panic. A fact that fails
+/// validation counts as dropped; when a lock stays busy the fact is lost
+/// without a count, because counting needs the same lock.
+pub fn record_without_waiting(event: &str, fields: BTreeMap<String, Value>, op: Option<String>) {
+    let fact = prepare(event, fields, op);
+    #[cfg(any(test, feature = "test-support"))]
+    let fact = match fact {
+        Ok(fact) => match capture::divert(fact) {
+            Some(fact) => Ok(fact),
+            None => return,
+        },
+        Err(error) => Err(error),
+    };
+    let Some(mut queue) = lock_without_waiting(QUEUE.get_or_init(Mutex::default)) else {
+        return;
+    };
+    match fact {
+        Ok(fact) => queue.record(fact),
+        Err(_) => queue.dropped = queue.dropped.saturating_add(1),
+    }
+    drop(queue);
+    wake_without_waiting();
+}
+
+/// Tries a lock for a bounded number of yields. Ordinary holders keep these
+/// locks for one queue operation or one host callback, so they release them
+/// well within the budget; a lock still held afterwards belongs to the
+/// panicking thread itself.
+fn lock_without_waiting<T>(mutex: &Mutex<T>) -> Option<MutexGuard<'_, T>> {
+    const ATTEMPTS: usize = 1_000;
+    for _ in 0..ATTEMPTS {
+        match mutex.try_lock() {
+            Ok(guard) => return Some(guard),
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => return Some(poisoned.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => std::thread::yield_now(),
+        }
+    }
+    None
+}
+
+/// [`wake`] for [`record_without_waiting`]: a signal it cannot deliver is
+/// handed back, so the next recorded fact raises it again.
+fn wake_without_waiting() {
+    if WAKE_REQUESTED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let Some(waker) = lock_without_waiting(&WAKER) else {
+        WAKE_REQUESTED.store(false, Ordering::Release);
+        return;
+    };
+    if let Some(waker) = *waker {
+        // SAFETY: as in `wake`; holding WAKER serializes the call with removal.
+        unsafe { (waker.callback)(waker.context as *mut c_void) }
+    }
+}
+
 fn queue() -> MutexGuard<'static, CoreEventQueue> {
     QUEUE
         .get_or_init(Mutex::default)
@@ -451,6 +509,47 @@ mod tests {
         assert_eq!(snapshot.events[0].channel, "app");
         assert!(queue.drain().events.is_empty());
         assert_eq!(queue.drain().dropped, 0);
+    }
+
+    #[test]
+    fn lock_without_waiting_gives_up_on_a_held_lock_and_takes_a_poisoned_one() {
+        let mutex = Mutex::new(1);
+        {
+            let _held = mutex.lock().unwrap();
+            assert!(lock_without_waiting(&mutex).is_none());
+        }
+        assert_eq!(*lock_without_waiting(&mutex).unwrap(), 1);
+        let poisoned = std::sync::Arc::new(Mutex::new(2));
+        let holder = poisoned.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = holder.lock().unwrap();
+            panic!("poison the test lock");
+        })
+        .join();
+        assert!(poisoned.is_poisoned());
+        assert_eq!(*lock_without_waiting(&poisoned).unwrap(), 2);
+    }
+
+    #[test]
+    fn record_without_waiting_normalizes_like_record() {
+        let ((), events) = capture::run(false, || {
+            record_without_waiting(
+                "app.core.panic_interrupted",
+                BTreeMap::from([
+                    ("boundary".into(), json!("thread")),
+                    ("panic".into(), json!("index out of bounds\nlen is 0")),
+                ]),
+                Some("op-1".into()),
+            );
+        });
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event, "app.core.panic_interrupted");
+        assert_eq!(events[0].level, LogLevel::Error);
+        assert_eq!(events[0].op.as_deref(), Some("op-1"));
+        assert_eq!(
+            events[0].fields["panic"],
+            json!("index out of boundslen is 0")
+        );
     }
 
     #[test]
