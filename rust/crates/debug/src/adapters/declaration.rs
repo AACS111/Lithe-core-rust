@@ -133,8 +133,9 @@ pub struct DebugExecutable {
     pub(crate) candidates: Vec<String>,
 }
 
-/// Typed projections from the target into known DAP fields. Each field has
-/// exactly one legal source, so a binding is a fact, not an expression.
+/// Typed projections from the target into DAP arguments. Each fixed field has
+/// a closed set of legal sources, and `adapterArguments` reads from another
+/// closed set, so a binding is a fact, not an expression.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DebugTargetBindings {
@@ -157,6 +158,13 @@ pub struct DebugTargetBindings {
     /// Where a remote `host:port` goes. Attach only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) connection: Option<DebugConnectionBinding>,
+    /// Top-level arguments only this adapter defines, each filled from a path
+    /// fact of the target: `target.path`, `target.directory` or
+    /// `target.workingDirectory`. Delve, for example, builds the program in
+    /// `dlvCwd` rather than in its own working directory, which a host sets
+    /// to the workspace root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) adapter_arguments: Option<BTreeMap<String, String>>,
 }
 
 /// Where each fact of a remote target lands in the adapter's attach

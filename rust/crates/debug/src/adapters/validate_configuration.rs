@@ -59,6 +59,7 @@ impl DebugConfiguration {
             && bindings.args.is_none()
             && bindings.env.is_none()
             && bindings.connection.is_none()
+            && bindings.adapter_arguments.is_none()
         {
             return Err(invalid(
                 &binding_field,
@@ -86,6 +87,13 @@ impl DebugConfiguration {
                 ));
             }
         }
+        if let Some(named) = &bindings.adapter_arguments {
+            validate_adapter_arguments(
+                &format!("{binding_field}.adapterArguments"),
+                named,
+                self.arguments.as_ref(),
+            )?;
+        }
         // `processId` names a running process and `connection` a remote
         // endpoint, which only attach has.
         if ((bindings.process_id.is_some() || bindings.connection.is_some())
@@ -104,6 +112,13 @@ impl DebugConfiguration {
             ]
             .into_iter()
             .filter_map(|(name, declared)| declared.then_some(name))
+            .chain(
+                bindings
+                    .adapter_arguments
+                    .iter()
+                    .flatten()
+                    .map(|(name, _)| name.as_str()),
+            )
             .collect();
             connection.validate(
                 &format!("{binding_field}.connection"),
@@ -113,6 +128,57 @@ impl DebugConfiguration {
         }
         Ok(())
     }
+}
+
+/// Checks the adapter-specific arguments a configuration binds: each is a
+/// top-level name that nothing else sets, read from a path fact.
+fn validate_adapter_arguments(
+    field: &str,
+    named: &BTreeMap<String, String>,
+    defaults: Option<&Map<String, Value>>,
+) -> Validation<()> {
+    if named.is_empty() || named.len() > MAX_ADAPTER_ARGUMENTS {
+        return Err(invalid(
+            field,
+            format!("adapterArguments binds 1-{MAX_ADAPTER_ARGUMENTS} arguments."),
+        ));
+    }
+    for (name, source) in named {
+        if !is_argument_name(name) {
+            return Err(invalid(
+                field,
+                "An argument name is a letter or underscore followed by letters, digits, underscores, or hyphens.",
+            ));
+        }
+        let entry = format!("{field}.{name}");
+        if FIXED_BINDINGS.contains(&name.as_str()) {
+            return Err(invalid(entry, format!("{name} has a binding of its own.")));
+        }
+        if crate::backend_start::is_host_key(name) {
+            return Err(invalid(
+                entry,
+                "The argument belongs to the host and cannot be set by a plugin.",
+            ));
+        }
+        if !ADAPTER_ARGUMENT_FACTS.contains(&source.as_str()) {
+            return Err(invalid(
+                entry,
+                format!(
+                    "An adapter argument can only be bound to {}.",
+                    ADAPTER_ARGUMENT_FACTS.join(" or ")
+                ),
+            ));
+        }
+        // A binding only fills an argument the defaults leave out, so a
+        // default of the same name would make the binding dead.
+        if defaults.is_some_and(|defaults| defaults.contains_key(name)) {
+            return Err(invalid(
+                entry,
+                "The argument is already set by the configuration's own arguments.",
+            ));
+        }
+    }
+    Ok(())
 }
 
 impl DebugExecutable {

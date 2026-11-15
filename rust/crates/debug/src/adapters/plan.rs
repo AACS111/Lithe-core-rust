@@ -155,6 +155,18 @@ pub fn plan(
     {
         return Err(missing("target.workingDirectory", "working directory"));
     }
+    for fact in bindings.adapter_arguments.iter().flat_map(BTreeMap::values) {
+        if path_fact(target, fact).is_some() {
+            continue;
+        }
+        return Err(match fact.as_str() {
+            "target.workingDirectory" => missing("target.workingDirectory", "working directory"),
+            TARGET_DIRECTORY if target.path.as_deref().is_some_and(|path| !path.is_empty()) => {
+                missing("target.path", "path inside a directory")
+            }
+            _ => missing("target.path", "path"),
+        });
+    }
     if let Some(connection) = &bindings.connection {
         connection_endpoint(target)?;
         if let Some(shape) = &connection.path_mappings {

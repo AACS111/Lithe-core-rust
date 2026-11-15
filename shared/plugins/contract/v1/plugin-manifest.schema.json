@@ -685,7 +685,7 @@
           "$ref": "#/$defs/debugPackagePath"
         },
         "targetBindings": {
-          "description": "Typed projections into known DAP fields. They only fill missing arguments; explicit values retain their existing precedence.",
+          "description": "Typed projections into DAP arguments. They only fill missing arguments; explicit values retain their existing precedence.",
           "type": "object",
           "additionalProperties": false,
           "minProperties": 1,
@@ -705,6 +705,17 @@
             "connection": {
               "description": "Attach only. Where the remote target's host and port go. Unlike the other bindings, each value is the destination argument path, because adapters name and nest these differently.",
               "$ref": "#/$defs/debugConnectionBinding"
+            },
+            "adapterArguments": {
+              "description": "Top-level DAP arguments only this adapter defines, each filled from a path fact of the target when the request's `arguments` leave it out, for example Delve's `dlvCwd`, where it builds the program. A name may not be `program`, `processId`, `cwd`, `args` or `env` (they have their own bindings), `noDebug` or start with `__` (the host's), a key of the configuration's own `arguments`, or overlap a `connection` destination.",
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 8,
+              "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$" },
+              "additionalProperties": {
+                "description": "`target.path` is the target's own path, `target.directory` the directory containing it, `target.workingDirectory` the working directory.",
+                "enum": ["target.path", "target.directory", "target.workingDirectory"]
+              }
             }
           }
         },

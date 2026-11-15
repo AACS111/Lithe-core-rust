@@ -109,13 +109,17 @@ fn decode(manifest: &impl DebugManifest, params: Value) -> Validation<Value> {
     }))
 }
 
+/// Whether a DAP argument belongs to the host (see `reject_host_keys`). A
+/// plugin sets one neither through its backend's configuration nor through a
+/// target binding.
+pub(crate) fn is_host_key(key: &str) -> bool {
+    key == NO_DEBUG_KEY || key.starts_with(HOST_KEY_PREFIX)
+}
+
 /// Refuses a configuration that sets a key the host owns: `noDebug`, which the
 /// session mode decides, or a `__` key, which carries the host's bookkeeping.
 pub(crate) fn reject_host_keys(configuration: &Map<String, Value>) -> Validation<()> {
-    match configuration
-        .keys()
-        .find(|key| key.as_str() == NO_DEBUG_KEY || key.starts_with(HOST_KEY_PREFIX))
-    {
+    match configuration.keys().find(|key| is_host_key(key)) {
         Some(key) => Err(invalid(
             &format!("configuration.{key}"),
             "The key belongs to the host and cannot be set by a plugin.",

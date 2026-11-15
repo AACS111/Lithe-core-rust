@@ -72,6 +72,7 @@
 - `selectors` 决定 Lithe 在哪些目标上自动选这个适配器：`targetKinds` 是目标种类，`languageIDs` 是语言。不写 `selectors` 表示只能被用户显式选择。
 - `languages[]` 声明适配器服务的语言。如果这个语言已经由别的插件提供（例如 Rust），你的声明只会给它增加“可以调试”的能力，并并入你声明的文件扩展名；语言名、语言标识和语言服务器不变，装上调试器也不会重启正在运行的语言服务器。
 - `targetBindings` 把调试目标的事实填进适配器的启动参数：`program` ← 目标路径（`target.path`），或目标所在目录（`target.directory`，Delve 这类按包构建再调试的适配器用它），`cwd` ← 工作目录，`processId` ← 进程 ID。只填 `arguments` 里没写的字段，不会覆盖你显式写出的默认值。目标缺少绑定要读的事实时，Lithe 会拒绝这次启动并说明缺什么。
+- 适配器自己定义的参数用 `targetBindings.adapterArguments`，键是参数名，值是 `target.path`、`target.directory` 或 `target.workingDirectory`。例如 Delve 在 `dlvCwd` 里编译程序，而不是在它自己的工作目录（宿主设为工作区根目录）里编译，所以 Go 插件写 `"adapterArguments": { "dlvCwd": "target.directory" }`，工作区根目录没有 `go.mod` 时也能在包所在的模块里编译。最多 8 个参数；不能用 `program`、`processId`、`cwd`、`args`、`env`（它们有自己的绑定）、`noDebug` 或 `__` 开头的名字（归宿主所有），也不能和 `arguments` 里的默认值或 `connection` 的目标重名。
 - `configurationTypes` 声明适配器对应的 `launch.json` `type`，用于导入用户已有的 VS Code 风格配置。
 
 ### 3. 怎么启动适配器
@@ -269,6 +270,7 @@ Key points:
 - `selectors` decide on which targets Lithe picks this adapter automatically: `targetKinds` are target kinds and `languageIDs` are languages. Without `selectors`, the adapter can only be chosen explicitly by the user.
 - `languages[]` declares the languages the adapter serves. If another plugin already provides the language (for example Rust), your declaration only adds the ability to debug it and merges in the file extensions you declare; the language name, language ID, and language server stay the same, and installing the debugger does not restart a running language server.
 - `targetBindings` fills facts about the debug target into the adapter's launch arguments: `program` ← the target path (`target.path`) or the directory containing it (`target.directory`, for an adapter such as Delve that builds and debugs a package), `cwd` ← the working directory, `processId` ← the process ID. Only fields missing from `arguments` are filled; defaults you wrote explicitly are never overwritten. When the target lacks a fact a binding reads, Lithe refuses the launch and says what is missing.
+- Arguments the adapter defines itself go in `targetBindings.adapterArguments`: each key is the argument name and each value is `target.path`, `target.directory` or `target.workingDirectory`. Delve, for example, builds the program in `dlvCwd`, not in its own working directory (which the host sets to the workspace root), so a Go plugin writes `"adapterArguments": { "dlvCwd": "target.directory" }` and the build finds the package's module even when the workspace root has no `go.mod`. Up to 8 arguments; a name may not be `program`, `processId`, `cwd`, `args` or `env` (they have their own bindings), `noDebug` or start with `__` (they belong to the host), or repeat a default in `arguments` or a `connection` destination.
 - `configurationTypes` declares the `launch.json` `type` values the adapter matches, used to import the user's existing VS Code-style configurations.
 
 ### 3. Launching the adapter

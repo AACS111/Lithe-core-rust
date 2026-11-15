@@ -2174,6 +2174,77 @@ fn debug_start_arguments_bind_program_to_the_directory_of_the_target() {
 }
 
 #[test]
+fn debug_start_arguments_fill_adapter_arguments_from_path_facts() {
+    let (root, path, directory) = if cfg!(windows) {
+        (r"C:\work", r"C:\work\cmd\app\main.go", r"C:\work\cmd\app")
+    } else {
+        ("/work", "/work/cmd/app/main.go", "/work/cmd/app")
+    };
+    // Delve's shape: it builds in `dlvCwd`, not in its own working directory,
+    // and runs the program there when `cwd` is left out.
+    let mut manifest = fixture("debug-adapter.plugin.json");
+    manifest["debugAdapters"][0]["configurations"]["launch"]["targetBindings"] = json!({
+        "program": "target.directory",
+        "adapterArguments": {
+            "dlvCwd": "target.directory",
+            "file": "target.path",
+            "root": "target.workingDirectory",
+        },
+    });
+    let start = |target: Value| {
+        lithe_plugin_manifest::debug_start_arguments_command(json!({
+            "manifest": manifest,
+            "adapterID": "example",
+            "request": "launch",
+            "facts": {
+                "registration": { "generation": 3, "currentGeneration": 3 },
+                "target": target,
+            },
+        }))
+        .expect("payload is well formed")
+    };
+    let launch = start(json!({ "kind": "file", "path": path, "workingDirectory": root }));
+    assert_eq!(launch["status"], "ok", "{launch}");
+    assert_eq!(
+        launch["arguments"],
+        json!({
+            "stopOnEntry": false,
+            "program": directory,
+            "dlvCwd": directory,
+            "file": path,
+            "root": root,
+        })
+    );
+
+    // A fact an adapter argument reads must be there, or the start is refused
+    // before the adapter builds in the wrong place.
+    let refused = start(json!({ "kind": "file", "path": path }));
+    assert_eq!(
+        refused["error"]["code"], "debug.target.invalid",
+        "{refused}"
+    );
+    assert_eq!(
+        refused["error"]["field"], "target.workingDirectory",
+        "{refused}"
+    );
+}
+
+#[test]
+fn debug_adapter_arguments_survive_manifest_normalization() {
+    let mut manifest = fixture("debug-adapter.plugin.json");
+    manifest["debugAdapters"][0]["configurations"]["launch"]["targetBindings"]
+        ["adapterArguments"] = json!({ "dlvCwd": "target.directory" });
+    let outcome = validate(manifest);
+    assert_eq!(outcome["status"], "ok", "{outcome}");
+    // Hosts read the normalized declaration, so the binding must survive it.
+    assert_eq!(
+        outcome["plugin"]["debugAdapters"][0]["configurations"]["launch"]["targetBindings"]
+            ["adapterArguments"],
+        json!({ "dlvCwd": "target.directory" })
+    );
+}
+
+#[test]
 fn debug_executable_plan_lists_the_configured_path_and_ordered_candidates() {
     let plan = debug_executable_plan(
         "native",

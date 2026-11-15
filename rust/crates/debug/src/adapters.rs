@@ -23,7 +23,7 @@ use lithe_plugin_model::settings::DeclaredSettings;
 use lithe_plugin_model::{invalid, is_safe_relative_path, PluginRejection, Validation};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{json, Map, Value};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::net::IpAddr;
 
 mod announcement;
@@ -92,6 +92,19 @@ const TARGET_EXECUTABLE: &str = "target.executable";
 /// The `targetBindings.program` source that reads the directory containing the
 /// target's path, for adapters that debug a package rather than one file.
 const TARGET_DIRECTORY: &str = "target.directory";
+
+/// Facts an `adapterArguments` binding may read: the target's own path, the
+/// directory containing it, and the working directory. Each means the same to
+/// every adapter, whatever the adapter calls the argument.
+const ADAPTER_ARGUMENT_FACTS: &[&str] =
+    &["target.path", TARGET_DIRECTORY, "target.workingDirectory"];
+
+/// Most adapter-specific arguments one configuration may bind.
+const MAX_ADAPTER_ARGUMENTS: usize = 8;
+
+/// Arguments that have a typed binding of their own, so `adapterArguments`
+/// may not name them.
+const FIXED_BINDINGS: &[&str] = &["program", "processId", "cwd", "args", "env"];
 
 /// The target kind of a remote `host:port` the debuggee listens on.
 const TARGET_CONNECTION: &str = "connection";

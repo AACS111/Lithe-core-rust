@@ -179,6 +179,13 @@ fn bound_arguments(
         &bindings.env,
         target.environment.as_ref().map(|env| json!(env)),
     );
+    for (name, fact) in bindings.adapter_arguments.iter().flatten() {
+        if let Some(value) = path_fact(target, fact) {
+            arguments
+                .entry(name.clone())
+                .or_insert_with(|| Value::from(value));
+        }
+    }
     let connection = match &bindings.connection {
         Some(binding) => Some(bind_connection(binding, target, &mut arguments)?),
         None => None,
@@ -196,6 +203,18 @@ pub(crate) fn target_directory(path: &str) -> Option<&str> {
         .parent()
         .and_then(std::path::Path::to_str)
         .filter(|directory| !directory.is_empty())
+}
+
+/// The value of a path fact an `adapterArguments` binding reads, or `None`
+/// when the target does not carry it.
+pub(crate) fn path_fact<'a>(target: &'a TargetFacts, fact: &str) -> Option<&'a str> {
+    let present = |value: &'a Option<String>| value.as_deref().filter(|value| !value.is_empty());
+    match fact {
+        "target.path" => present(&target.path),
+        TARGET_DIRECTORY => present(&target.path).and_then(target_directory),
+        "target.workingDirectory" => present(&target.working_directory),
+        _ => None,
+    }
 }
 
 /// Writes the target's endpoint, and its path mappings when the adapter takes
