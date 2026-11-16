@@ -781,6 +781,7 @@ or removing a command fails until the table changes in the same commit.
 | `git.changedFileGroups` | Group the changed files of a commit, stash or shelf by folder, folders and files in natural order |
 | `git.worktreeCreationPreview` | Derive the worktree creation dialog's reference choices, checked branch name, suggested destination and readiness without running Git |
 | `git.pushPreview` | Resolve a local branch push destination and the bounded commits not present on that remote base |
+| `git.workspacePushPreview` | Review pushing the checked-out branch of every bound repository, in push order |
 | `git.commit` | Return one structured commit by revision with its full message body |
 | `git.commitFiles` | Return files changed by one commit |
 | `git.comparison` | Return files changed between a reference and the working tree |
@@ -1524,6 +1525,36 @@ reviewed push uses the preview's immutable `localHead` OID as the refspec source
 so a repository change after validation cannot add unreviewed commits to the
 operation. Because Git cannot infer an upstream from an OID source, Core
 explicitly configures the reviewed local branch after a successful first push.
+
+`git.workspacePushPreview` reviews pushing several repositories at once, like
+IntelliJ IDEA's Push dialog, which lists every repository of a project with what
+it would push. It accepts `repositories: [{ id, root }]` (the bindings
+`git.workspaceCommitPrepare` takes, at most 10,000, IDs unique), an optional
+`limit` (default 100) and `pushTags` applied to every preview, and optional
+`pushTargets: { <repository-id>: "publish" | "upstream" }` for divergent
+upstreams. It returns `{ repositories: [{ id, state, branch?, preview?,
+needsTarget, records, detail? }] }` with one entry per binding. `state` is
+`ready` (commits to send, or the remote branch does not exist yet), `upToDate`,
+`noRemote` (no remote configured), `emptyRepository` (the branch has no commit),
+`detachedHead`, or `failed` (the root is not a readable repository, or Git could
+not resolve the destination; `detail` carries Core's message and Git's output).
+`branch` is the checked-out branch's short name, absent when HEAD is detached or
+the repository could not be read. `preview` is present for `ready` and
+`upToDate` and is exactly the `git.pushPreview` of that branch with the same
+`limit`, `pushTags` and `pushTarget`; a client pushes a repository with `git.write`
+`push`, that preview as `expectedPush`, the same `pushTags` and `pushTarget`, and
+`checkSubmodules: true`. `needsTarget` is true when the upstream has a different
+name (`targetKind: divergent`) and `pushTargets` gave that repository no
+destination; such a push is refused until the client previews again with one.
+The list is in push order: a repository comes after every listed repository it
+records as a gitlink, otherwise in request order, using the relations
+`git.workspaceCommitPrepare` orders commits by. `records` names those listed
+submodules, so a client skips a parent whose submodule push failed instead of
+letting `--recurse-submodules=check` refuse it. A failed repository does not fail
+the request; duplicate IDs, more than 10,000 repositories, an unsupported
+`pushTags`, a `pushTargets` key that names no listed repository, unknown fields,
+or a gitlink cycle return `invalid_request`. Repositories are read one after
+another, nothing is fetched and nothing is written.
 
 New reference-based workflows send `gitReference` as `{ "fullName": string,
 "shortName": string, "kind": "local" | "remote" | "tag" }`. Core verifies
