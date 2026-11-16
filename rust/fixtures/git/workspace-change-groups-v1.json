@@ -1,0 +1,782 @@
+{
+  "version": 1,
+  "description": "git.workspaceChangeGroups takes the workspace.repositories entries unchanged, each with the git.status changes read for it. Groups are the repositories with changes in discovery order. A checkbox unstages every staged change that can toggle when all such changes are staged with nothing left in the worktree, and otherwise stages every change that can toggle and is unstaged or still changed in the worktree; paths list both sides of a rename. The workspace line applies one operation, chosen from all repositories, to every repository with something to write. parentReference is present when the deepest listed ancestor's status lists the repository as a gitlink: moved when its recorded commit changed, unchanged otherwise. An untracked or ignored independent repository has none.",
+  "cases": [
+    {
+      "name": "aFolderWithoutItsOwnRepository",
+      "request": {
+        "repositories": [
+          {
+            "path": "/workspace/service-a",
+            "id": "service-a",
+            "name": "service-a",
+            "role": "nested",
+            "changes": [
+              {
+                "path": "a.go",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "canToggleStaging": true
+              },
+              {
+                "path": "tmp/",
+                "status": "??",
+                "staged": false,
+                "worktree": true,
+                "untracked": true,
+                "canToggleStaging": true,
+                "untrackedFileCount": 3
+              }
+            ]
+          },
+          {
+            "path": "/workspace/service-b",
+            "id": "service-b",
+            "name": "service-b",
+            "role": "nested",
+            "changes": [
+              {
+                "path": "main.go",
+                "status": "M",
+                "staged": true,
+                "worktree": false,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          },
+          {
+            "path": "/workspace/libs/core",
+            "id": "libs/core",
+            "name": "libs/core",
+            "role": "nested",
+            "changes": []
+          }
+        ]
+      },
+      "response": {
+        "groups": [
+          {
+            "id": "service-a",
+            "name": "service-a",
+            "role": "nested",
+            "fileCount": 4,
+            "stagedCount": 0,
+            "allStaged": false,
+            "toggleable": true,
+            "staging": {
+              "operation": "stage",
+              "paths": [
+                "a.go",
+                "tmp/"
+              ]
+            }
+          },
+          {
+            "id": "service-b",
+            "name": "service-b",
+            "role": "nested",
+            "fileCount": 1,
+            "stagedCount": 1,
+            "allStaged": true,
+            "toggleable": true,
+            "staging": {
+              "operation": "unstage",
+              "paths": [
+                "main.go"
+              ]
+            }
+          }
+        ],
+        "fileCount": 5,
+        "stagedCount": 1,
+        "allStaged": false,
+        "stageAll": {
+          "operation": "stage",
+          "repositories": [
+            {
+              "id": "service-a",
+              "paths": [
+                "a.go",
+                "tmp/"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "submoduleReferencesAndIndependentRepositories",
+      "request": {
+        "repositories": [
+          {
+            "path": "/projects/shop",
+            "id": ".",
+            "name": "shop",
+            "role": "workspace",
+            "changes": [
+              {
+                "path": "modules/payments",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "submodule": {
+                  "commitChanged": false,
+                  "trackedChanges": true,
+                  "untrackedChanges": false
+                },
+                "canToggleStaging": false
+              },
+              {
+                "path": "vendor/tool",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "submodule": {
+                  "commitChanged": true,
+                  "trackedChanges": false,
+                  "untrackedChanges": false
+                },
+                "canToggleStaging": true
+              },
+              {
+                "path": "README.md",
+                "status": "M",
+                "staged": true,
+                "worktree": false,
+                "untracked": false,
+                "canToggleStaging": true
+              },
+              {
+                "path": "docs/new.md",
+                "originalPath": "docs/old.md",
+                "status": "R",
+                "staged": true,
+                "worktree": true,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          },
+          {
+            "path": "/projects/shop/extras",
+            "id": "extras",
+            "name": "extras",
+            "role": "nested",
+            "changes": [
+              {
+                "path": "e.txt",
+                "status": "??",
+                "staged": false,
+                "worktree": true,
+                "untracked": true,
+                "canToggleStaging": true
+              }
+            ]
+          },
+          {
+            "path": "/projects/shop/modules/payments",
+            "id": "modules/payments",
+            "name": "modules/payments",
+            "role": "nested",
+            "changes": [
+              {
+                "path": "pay.go",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          },
+          {
+            "path": "/projects/shop/vendor/tool",
+            "id": "vendor/tool",
+            "name": "vendor/tool",
+            "role": "nested",
+            "changes": [
+              {
+                "path": "x.c",
+                "status": "M",
+                "staged": true,
+                "worktree": false,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "groups": [
+          {
+            "id": ".",
+            "name": "shop",
+            "role": "workspace",
+            "fileCount": 4,
+            "stagedCount": 2,
+            "allStaged": false,
+            "toggleable": true,
+            "staging": {
+              "operation": "stage",
+              "paths": [
+                "vendor/tool",
+                "docs/old.md",
+                "docs/new.md"
+              ]
+            }
+          },
+          {
+            "id": "extras",
+            "name": "extras",
+            "role": "nested",
+            "fileCount": 1,
+            "stagedCount": 0,
+            "allStaged": false,
+            "toggleable": true,
+            "staging": {
+              "operation": "stage",
+              "paths": [
+                "e.txt"
+              ]
+            }
+          },
+          {
+            "id": "modules/payments",
+            "name": "modules/payments",
+            "role": "nested",
+            "fileCount": 1,
+            "stagedCount": 0,
+            "allStaged": false,
+            "toggleable": true,
+            "staging": {
+              "operation": "stage",
+              "paths": [
+                "pay.go"
+              ]
+            },
+            "parentReference": "unchanged"
+          },
+          {
+            "id": "vendor/tool",
+            "name": "vendor/tool",
+            "role": "nested",
+            "fileCount": 1,
+            "stagedCount": 1,
+            "allStaged": true,
+            "toggleable": true,
+            "staging": {
+              "operation": "unstage",
+              "paths": [
+                "x.c"
+              ]
+            },
+            "parentReference": "moved"
+          }
+        ],
+        "fileCount": 7,
+        "stagedCount": 3,
+        "allStaged": false,
+        "stageAll": {
+          "operation": "stage",
+          "repositories": [
+            {
+              "id": ".",
+              "paths": [
+                "vendor/tool",
+                "docs/old.md",
+                "docs/new.md"
+              ]
+            },
+            {
+              "id": "extras",
+              "paths": [
+                "e.txt"
+              ]
+            },
+            {
+              "id": "modules/payments",
+              "paths": [
+                "pay.go"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "everythingStagedUnstagesEveryRepository",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w",
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "changes": [
+              {
+                "path": "sub",
+                "status": "M",
+                "staged": true,
+                "worktree": false,
+                "untracked": false,
+                "submodule": {
+                  "commitChanged": true,
+                  "trackedChanges": false,
+                  "untrackedChanges": false
+                },
+                "canToggleStaging": true
+              },
+              {
+                "path": "a.txt",
+                "status": "M",
+                "staged": true,
+                "worktree": false,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          },
+          {
+            "path": "/w/sub",
+            "id": "sub",
+            "name": "sub",
+            "role": "nested",
+            "changes": [
+              {
+                "path": "inner",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "submodule": {
+                  "commitChanged": false,
+                  "trackedChanges": true,
+                  "untrackedChanges": false
+                },
+                "canToggleStaging": false
+              },
+              {
+                "path": "s.txt",
+                "status": "M",
+                "staged": true,
+                "worktree": false,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          },
+          {
+            "path": "/w/sub/inner",
+            "id": "sub/inner",
+            "name": "sub/inner",
+            "role": "nested",
+            "changes": [
+              {
+                "path": "i.txt",
+                "status": "M",
+                "staged": true,
+                "worktree": false,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "groups": [
+          {
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "fileCount": 2,
+            "stagedCount": 2,
+            "allStaged": true,
+            "toggleable": true,
+            "staging": {
+              "operation": "unstage",
+              "paths": [
+                "sub",
+                "a.txt"
+              ]
+            }
+          },
+          {
+            "id": "sub",
+            "name": "sub",
+            "role": "nested",
+            "fileCount": 2,
+            "stagedCount": 1,
+            "allStaged": true,
+            "toggleable": true,
+            "staging": {
+              "operation": "unstage",
+              "paths": [
+                "s.txt"
+              ]
+            },
+            "parentReference": "moved"
+          },
+          {
+            "id": "sub/inner",
+            "name": "sub/inner",
+            "role": "nested",
+            "fileCount": 1,
+            "stagedCount": 1,
+            "allStaged": true,
+            "toggleable": true,
+            "staging": {
+              "operation": "unstage",
+              "paths": [
+                "i.txt"
+              ]
+            },
+            "parentReference": "unchanged"
+          }
+        ],
+        "fileCount": 5,
+        "stagedCount": 4,
+        "allStaged": true,
+        "stageAll": {
+          "operation": "unstage",
+          "repositories": [
+            {
+              "id": ".",
+              "paths": [
+                "sub",
+                "a.txt"
+              ]
+            },
+            {
+              "id": "sub",
+              "paths": [
+                "s.txt"
+              ]
+            },
+            {
+              "id": "sub/inner",
+              "paths": [
+                "i.txt"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "anOpenedSubfolderOfTheContainingRepository",
+      "request": {
+        "repositories": [
+          {
+            "path": "/projects/mono",
+            "id": "../..",
+            "name": "mono",
+            "role": "workspace",
+            "changes": [
+              {
+                "path": "packages/app/vendor/lib",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "submodule": {
+                  "commitChanged": true,
+                  "trackedChanges": false,
+                  "untrackedChanges": false
+                },
+                "canToggleStaging": true
+              }
+            ]
+          },
+          {
+            "path": "/projects/mono/packages/app/vendor/lib",
+            "id": "vendor/lib",
+            "name": "vendor/lib",
+            "role": "nested",
+            "changes": [
+              {
+                "path": "l.c",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "groups": [
+          {
+            "id": "../..",
+            "name": "mono",
+            "role": "workspace",
+            "fileCount": 1,
+            "stagedCount": 0,
+            "allStaged": false,
+            "toggleable": true,
+            "staging": {
+              "operation": "stage",
+              "paths": [
+                "packages/app/vendor/lib"
+              ]
+            }
+          },
+          {
+            "id": "vendor/lib",
+            "name": "vendor/lib",
+            "role": "nested",
+            "fileCount": 1,
+            "stagedCount": 0,
+            "allStaged": false,
+            "toggleable": true,
+            "staging": {
+              "operation": "stage",
+              "paths": [
+                "l.c"
+              ]
+            },
+            "parentReference": "moved"
+          }
+        ],
+        "fileCount": 2,
+        "stagedCount": 0,
+        "allStaged": false,
+        "stageAll": {
+          "operation": "stage",
+          "repositories": [
+            {
+              "id": "../..",
+              "paths": [
+                "packages/app/vendor/lib"
+              ]
+            },
+            {
+              "id": "vendor/lib",
+              "paths": [
+                "l.c"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "onlyChildContentChangesWriteNothing",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w",
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "changes": [
+              {
+                "path": "sub",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "submodule": {
+                  "commitChanged": false,
+                  "trackedChanges": false,
+                  "untrackedChanges": true
+                },
+                "canToggleStaging": false
+              }
+            ]
+          },
+          {
+            "path": "/w/sub",
+            "id": "sub",
+            "name": "sub",
+            "role": "nested",
+            "changes": []
+          }
+        ]
+      },
+      "response": {
+        "groups": [
+          {
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "fileCount": 1,
+            "stagedCount": 0,
+            "allStaged": false,
+            "toggleable": false
+          }
+        ],
+        "fileCount": 1,
+        "stagedCount": 0,
+        "allStaged": false
+      }
+    },
+    {
+      "name": "noRepositories",
+      "request": {
+        "repositories": []
+      },
+      "response": {
+        "groups": [],
+        "fileCount": 0,
+        "stagedCount": 0,
+        "allStaged": false
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "duplicateId",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w/a",
+            "id": "a",
+            "name": "a",
+            "role": "nested",
+            "changes": []
+          },
+          {
+            "path": "/w/b",
+            "id": "a",
+            "name": "a",
+            "role": "nested",
+            "changes": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "twoWorkspaceRepositories",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w",
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "changes": []
+          },
+          {
+            "path": "/",
+            "id": "..",
+            "name": "/",
+            "role": "workspace",
+            "changes": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "missingChanges",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w",
+            "id": ".",
+            "name": "w",
+            "role": "workspace"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknownRepositoryField",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w",
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "changes": [],
+            "branch": "main"
+          }
+        ]
+      }
+    },
+    {
+      "name": "changeWithoutStagingState",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w",
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "changes": [
+              {
+                "path": "a",
+                "status": "M",
+                "worktree": true,
+                "canToggleStaging": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "emptyChangePath",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w",
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "changes": [
+              {
+                "path": "",
+                "status": "M",
+                "staged": false,
+                "worktree": true,
+                "untracked": false,
+                "canToggleStaging": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "emptyOriginalPath",
+      "request": {
+        "repositories": [
+          {
+            "path": "/w",
+            "id": ".",
+            "name": "w",
+            "role": "workspace",
+            "changes": [
+              {
+                "path": "a",
+                "status": "M",
+                "staged": true,
+                "worktree": false,
+                "untracked": false,
+                "canToggleStaging": true,
+                "originalPath": ""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknownField",
+      "request": {
+        "repositories": [],
+        "selected": "."
+      }
+    }
+  ]
+}

@@ -327,12 +327,24 @@ fn workspace_repositories_discovers_multiple_child_repositories() {
     .expect("workspace repositories response should be JSON");
 
     assert_eq!(response["ok"], true, "{response:?}");
+    // The opened folder is no repository itself, so every entry is nested and keyed
+    // by its path below the folder.
+    let nested_id = format!("service-a/vendor{}", "/d".repeat(40));
     assert_eq!(
         response["data"]["repositories"],
         serde_json::json!([
-            { "path": reported_repository_path(&first) },
-            { "path": reported_repository_path(&second) },
-            { "path": reported_repository_path(&nested) }
+            {
+                "path": reported_repository_path(&first),
+                "id": "service-a", "name": "service-a", "role": "nested"
+            },
+            {
+                "path": reported_repository_path(&second),
+                "id": "service-b", "name": "service-b", "role": "nested"
+            },
+            {
+                "path": reported_repository_path(&nested),
+                "id": nested_id, "name": nested_id, "role": "nested"
+            }
         ])
     );
 
@@ -374,7 +386,10 @@ fn workspace_repositories_skips_dangling_gitfile_pointers() {
     assert_eq!(response["ok"], true, "{response:?}");
     assert_eq!(
         response["data"]["repositories"],
-        serde_json::json!([{ "path": reported_repository_path(&healthy) }])
+        serde_json::json!([{
+            "path": reported_repository_path(&healthy),
+            "id": "healthy", "name": "healthy", "role": "nested"
+        }])
     );
 
     fs::remove_dir_all(root).expect("temporary workspace should be removable");

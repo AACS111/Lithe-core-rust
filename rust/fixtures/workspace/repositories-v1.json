@@ -1,16 +1,79 @@
 {
-  "command": "workspace.repositories",
-  "payload": {
-    "root": "/workspace"
-  },
-  "response": {
-    "repositories": [
-      {
-        "path": "/workspace/service-a"
+  "cases": [
+    {
+      "name": "opened folder holds independent checkouts and is no repository",
+      "command": "workspace.repositories",
+      "payload": {
+        "root": "/workspace"
       },
-      {
-        "path": "/workspace/service-b"
+      "response": {
+        "repositories": [
+          {
+            "path": "/workspace/service-a",
+            "id": "service-a",
+            "name": "service-a",
+            "role": "nested"
+          },
+          {
+            "path": "/workspace/service-b",
+            "id": "service-b",
+            "name": "service-b",
+            "role": "nested"
+          },
+          {
+            "path": "/workspace/libs/core",
+            "id": "libs/core",
+            "name": "libs/core",
+            "role": "nested"
+          }
+        ]
       }
-    ]
-  }
+    },
+    {
+      "name": "opened folder is the workspace repository",
+      "command": "workspace.repositories",
+      "payload": {
+        "root": "/projects/shop"
+      },
+      "response": {
+        "repositories": [
+          {
+            "path": "/projects/shop",
+            "id": ".",
+            "name": "shop",
+            "role": "workspace"
+          },
+          {
+            "path": "/projects/shop/modules/payments",
+            "id": "modules/payments",
+            "name": "modules/payments",
+            "role": "nested"
+          }
+        ]
+      }
+    },
+    {
+      "name": "opened folder inside an enclosing checkout",
+      "command": "workspace.repositories",
+      "payload": {
+        "root": "/projects/mono/packages/app"
+      },
+      "response": {
+        "repositories": [
+          {
+            "path": "/projects/mono",
+            "id": "../..",
+            "name": "mono",
+            "role": "workspace"
+          },
+          {
+            "path": "/projects/mono/packages/app/vendor/lib",
+            "id": "vendor/lib",
+            "name": "vendor/lib",
+            "role": "nested"
+          }
+        ]
+      }
+    }
+  ]
 }

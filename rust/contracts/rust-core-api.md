@@ -770,6 +770,8 @@ or removing a command fails until the table changes in the same commit.
 | `git.historyLocate` | Append bounded history pages until one commit is found and report the budget, window cursor, and exhaustion |
 | `git.branchNamePreview` | Clean and validate a new branch name against already loaded references without running Git |
 | `git.repositoryColorAssignments` | Assign color slots to a bounded page of ordered repository identities |
+| `git.workspaceRepositorySelection` | Choose the workspace repository a view acts on and the others it lists for switching, from discovery entries and the previous pick |
+| `git.workspaceChangeGroups` | Group every workspace repository's status changes, plan each group's and the workspace line's staging, and report what a listed ancestor records for a submodule |
 | `git.updatePlan` | Route a branch Update and gate a Pull from facts the host collected: blockers, strategy default, whether to ask, and the expected checkout |
 | `git.historyWindow` | Plan a history refresh window, page merge, and selection retention over commit identities |
 | `git.graphProjection` | Project a loaded history window into commit-graph lanes, color IDs, routes, print elements, and labels, optionally filtered |
@@ -898,6 +900,21 @@ embedded spaces and long paths are not rejected by length; native Git/filesystem
 errors remain visible. In particular, Windows may reject an over-MAX_PATH Git
 working directory at process creation even when filesystem lookup succeeds;
 this is reported as `process_start_failed`, not a missing repository. Shared examples live in `rust/fixtures/git/windows-paths.json`.
+Each entry also carries the portable identity clients key repositories by:
+`id` is the root relative to the opened folder with `/` separators — `.` for the
+folder itself, `service-a` or `libs/core` below it, and one `..` per level for an
+enclosing repository (`../..` when the folder is `packages/app` of a checkout).
+It is the ID that `git.workspaceRepositorySelection`, `git.workspaceChangeGroups`,
+`git.workspaceCommitPrepare` and `git.repositoryColorAssignments` take; a remote
+workspace computes it from host paths, so it is the same as for a local folder.
+`role` is `workspace` for the repository that contains the opened folder (the
+folder itself or an enclosing checkout), at most one entry and always first, and
+`nested` for every repository below the folder. An opened folder outside every
+repository — a parent folder that only holds independent checkouts — has no
+`workspace` entry, and clients must not assume one exists. `name` is the label
+views show: the root folder's name for the workspace repository and the `id` for
+a nested one, so same-named folders in different places stay distinguishable. It
+is a file name, never translated. See `rust/fixtures/workspace/repositories-v1.json`.
 Core treats both
 `.git` directories and `.git` files as repository markers, but a marker only
 becomes a listed repository when Git can open it: a `.git` directory needs
@@ -1960,6 +1977,50 @@ Core rejects duplicates within a page and out-of-range offsets with
 Callers must keep pages from the same list generation together, cancel or discard
 stale results, and never recompute the slots per row. Color palettes remain native
 presentation. See `rust/fixtures/git/repository-colors-v1.json`.
+
+`git.workspaceRepositorySelection` is pure. It accepts `{ repositories,
+selected? }`, where `repositories` are the `workspace.repositories` entries
+`{ path, id, name, role }` passed back unchanged and in discovery order, and
+`selected` is the ID the view acted on before. The response is
+`{ active, fellBack, others }`: `active` is `selected` while it is still listed,
+otherwise the entry with role `workspace`, otherwise the first entry, and `null`
+for an empty list; `fellBack` is `true` only when `selected` was given and is no
+longer listed, so the view drops state that belonged to it such as an open
+history cursor or a reference filter; `others` are the remaining IDs in
+discovery order, the groups the branch popup and the Git Log list for switching.
+The list holds at most 10,000 entries. An ID that is empty, longer than 4,096
+bytes, starts with `/`, or contains `\` or NUL, an empty path or name, a repeated
+ID or path, more than one `workspace` role, an unknown role, an empty `selected`,
+or an unknown field fails with `invalid_request`. See
+`rust/fixtures/git/workspace-repository-selection-v1.json`.
+
+`git.workspaceChangeGroups` is pure and validates `repositories` the same way;
+each entry also carries `changes`, the `git.status` changes read for that
+repository, passed through unchanged. Core reads `path`, `originalPath`,
+`staged`, `worktree`, `canToggleStaging`, `submodule.commitChanged`, and
+`untrackedFileCount`; other change fields are accepted and ignored. At most
+1,000,000 changes are accepted across the request, and an empty change path or
+original path fails with `invalid_request`. The response is `{ groups,
+fileCount, stagedCount, allStaged, stageAll? }`. `groups` lists the repositories
+that have changes in discovery order, each `{ id, name, role, fileCount,
+stagedCount, allStaged, toggleable, staging?, parentReference? }`. `fileCount`
+counts each file of a summarized untracked directory. `allStaged` is `true` when
+every change with `canToggleStaging` is staged with nothing left in the
+worktree and at least one exists. `staging` is `{ operation, paths }` and is
+absent when the checkbox writes nothing: `unstage` takes the staged changes that
+can toggle when `allStaged`, and `stage` otherwise takes the changes that can
+toggle and are unstaged or still changed in the worktree. Paths are
+repository-relative in change order, with both sides of a rename. `stageAll`
+is the workspace line's checkbox: one `operation`, chosen from `allStaged`
+across every repository, applied to every repository with something to write,
+as `{ operation, repositories: [{ id, paths }] }`. `parentReference` is present
+when the deepest listed ancestor's status lists the repository as a gitlink:
+`moved` when its recorded commit changed and `unchanged` when only the child's
+content did. An independent repository the ancestor tracks as untracked or
+ignores has none. Ancestry is compared on host paths, so a remote workspace's
+enclosing repository and its nested ones still relate. Views own folding,
+drawing, and running the staging writes. See
+`rust/fixtures/git/workspace-change-groups-v1.json`.
 
 `git.branchNamePreview` is pure: it never starts Git and only reads the
 reference facts the host already loaded. It accepts `rawName` (at most 1,024
@@ -4922,6 +4983,16 @@ execution binding, never a portable identity. The response is
 finds real gitlink relationships, includes clean parents when requested, orders
 children first, and adds push-only child work where needed. Cycles fail closed.
 A changed reviewed plan must be displayed and confirmed again before any step.
+
+Optional `workspaceRepositories` takes the opened folder's `workspace.repositories`
+entries unchanged, validated as `git.workspaceRepositorySelection` validates them,
+and binds every `nested` entry whose root `repositories` does not already bind, in
+discovery order, under its discovery `id`. A commit of the workspace therefore also
+commits the repositories nested in it, so the host binds only what it chose itself
+(usually the `workspace` entry, which Core never adds). An entry whose root no
+longer exists is skipped. Nothing is added while a `pathScope` is given or the
+`previous` plan had one, and a retry adds only IDs the `previous` session already
+held, so the reviewed plan never gains repositories between attempts.
 
 When `push` is set, Core also checks whether any repository's branch tracks a
 differently named remote branch (a `divergent` push destination, see

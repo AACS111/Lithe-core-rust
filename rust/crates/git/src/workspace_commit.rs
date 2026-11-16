@@ -6,8 +6,9 @@ pub use path_scope::PathScope;
 
 use super::{
     commit_state, DivergentPushDestination, GitCommitGitlink, GitCommitState, GitWriteRequest,
-    PushTargetChoiceRequest,
+    PushTargetChoiceRequest, WorkspaceRepositoryRole,
 };
+use crate::workspace_repositories::{validate_discovered, DiscoveredRepository};
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -159,6 +160,11 @@ pub struct PrepareRequest {
     pub(crate) previous: Option<Session>,
     #[serde(default)]
     pub(crate) reviewed: Option<Plan>,
+    /// `workspace.repositories` entries for the opened folder, passed back
+    /// unchanged. Core binds every nested one `repositories` does not already
+    /// bind, so a commit of the workspace also commits the repositories nested in it.
+    #[serde(default)]
+    pub(crate) workspace_repositories: Vec<DiscoveredRepository>,
 }
 
 #[derive(Debug, Serialize)]
@@ -209,11 +215,52 @@ fn validate_bindings(bindings: &[RepositoryBinding]) -> Result<(), CoreError> {
     Ok(())
 }
 
+/// Binds the nested repositories of `workspaceRepositories` that `repositories`
+/// does not already bind, in discovery order.
+///
+/// The entry with role `workspace` is the repository the host committed from and
+/// binds itself. A path-scoped commit acts only on the repositories it names, and
+/// a retry only on the repositories the previous plan bound, so neither gains
+/// new ones. A nested repository removed since discovery is skipped.
+fn bind_nested_repositories(request: &mut PrepareRequest) -> Result<(), CoreError> {
+    let discovered = std::mem::take(&mut request.workspace_repositories);
+    validate_discovered(&discovered)?;
+    let previous = request.previous.as_ref();
+    if request.path_scope.is_some() || previous.is_some_and(|s| s.plan.path_scope.is_some()) {
+        return Ok(());
+    }
+    for repository in discovered {
+        if repository.role == WorkspaceRepositoryRole::Workspace
+            || previous.is_some_and(|s| !s.states.contains_key(&repository.id))
+        {
+            continue;
+        }
+        let root = match super::validate_root(&repository.path) {
+            Ok(root) => root,
+            Err(error) if matches!(error.code, ErrorCode::WorkspaceNotFound) => continue,
+            Err(error) => return Err(error),
+        };
+        if request
+            .repositories
+            .iter()
+            .any(|binding| binding.root == root)
+        {
+            continue;
+        }
+        request.repositories.push(RepositoryBinding {
+            id: repository.id,
+            root,
+        });
+    }
+    Ok(())
+}
+
 /// Inspects every discovered repository before calculating dependencies and retry scope.
 pub fn prepare(mut request: PrepareRequest) -> Result<Preparation, CoreError> {
     for binding in &mut request.repositories {
         binding.root = super::validate_root(&binding.root)?;
     }
+    bind_nested_repositories(&mut request)?;
     validate_bindings(&request.repositories)?;
     let mut states = BTreeMap::new();
     for binding in &request.repositories {

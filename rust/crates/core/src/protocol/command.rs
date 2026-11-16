@@ -847,6 +847,10 @@ pub enum GitCommand {
     BranchNamePreview,
     /// Assigns palette slots to a page of ordered repository identities.
     RepositoryColorAssignments,
+    /// Chooses the workspace repository a view acts on (`git.workspaceRepositorySelection`).
+    WorkspaceRepositorySelection,
+    /// Groups workspace repositories' changes and plans their staging (`git.workspaceChangeGroups`).
+    WorkspaceChangeGroups,
     /// Plans a branch Update or Pull from collected facts (`git.updatePlan`).
     UpdatePlan,
     /// Plans history refresh windows, page merges, and selection retention (`git.historyWindow`).
@@ -1468,6 +1472,10 @@ impl CoreCommand {
             "git.repositoryColorAssignments" => {
                 Some(Self::Git(GitCommand::RepositoryColorAssignments))
             }
+            "git.workspaceRepositorySelection" => {
+                Some(Self::Git(GitCommand::WorkspaceRepositorySelection))
+            }
+            "git.workspaceChangeGroups" => Some(Self::Git(GitCommand::WorkspaceChangeGroups)),
             "git.updatePlan" => Some(Self::Git(GitCommand::UpdatePlan)),
             "git.historyWindow" => Some(Self::Git(GitCommand::HistoryWindow)),
             "git.graphProjection" => Some(Self::Git(GitCommand::GraphProjection)),

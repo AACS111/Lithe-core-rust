@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "description": "git.workspaceRepositorySelection takes the workspace.repositories entries unchanged and the ID a view picked before. The pick stays while it is listed; otherwise the view acts on the repository with role workspace, then on the first listed repository, and on none when nothing is listed. fellBack is true only when a pick was given and is no longer listed. others lists every other ID in discovery order.",
+  "cases": [
+    {
+      "name": "noPickActsOnTheContainingRepository",
+      "request": {
+        "repositories": [
+          {"path": "/projects/shop", "id": ".", "name": "shop", "role": "workspace"},
+          {"path": "/projects/shop/modules/payments", "id": "modules/payments", "name": "modules/payments", "role": "nested"}
+        ]
+      },
+      "response": {"active": ".", "fellBack": false, "others": ["modules/payments"]}
+    },
+    {
+      "name": "aListedPickStays",
+      "request": {
+        "repositories": [
+          {"path": "/projects/shop", "id": ".", "name": "shop", "role": "workspace"},
+          {"path": "/projects/shop/modules/payments", "id": "modules/payments", "name": "modules/payments", "role": "nested"},
+          {"path": "/projects/shop/tools", "id": "tools", "name": "tools", "role": "nested"}
+        ],
+        "selected": "modules/payments"
+      },
+      "response": {"active": "modules/payments", "fellBack": false, "others": [".", "tools"]}
+    },
+    {
+      "name": "aRemovedPickFallsBackToTheContainingRepository",
+      "request": {
+        "repositories": [
+          {"path": "/projects/mono", "id": "../..", "name": "mono", "role": "workspace"},
+          {"path": "/projects/mono/packages/app/vendor/lib", "id": "vendor/lib", "name": "vendor/lib", "role": "nested"}
+        ],
+        "selected": "vendor/old"
+      },
+      "response": {"active": "../..", "fellBack": true, "others": ["vendor/lib"]}
+    },
+    {
+      "name": "aFolderWithoutItsOwnRepositoryActsOnTheFirstNestedOne",
+      "request": {
+        "repositories": [
+          {"path": "/workspace/service-a", "id": "service-a", "name": "service-a", "role": "nested"},
+          {"path": "/workspace/service-b", "id": "service-b", "name": "service-b", "role": "nested"}
+        ]
+      },
+      "response": {"active": "service-a", "fellBack": false, "others": ["service-b"]}
+    },
+    {
+      "name": "aRemovedPickInAFolderWithoutItsOwnRepository",
+      "request": {
+        "repositories": [
+          {"path": "/workspace/service-b", "id": "service-b", "name": "service-b", "role": "nested"}
+        ],
+        "selected": "service-a"
+      },
+      "response": {"active": "service-b", "fellBack": true, "others": []}
+    },
+    {
+      "name": "noRepositories",
+      "request": {"repositories": [], "selected": "service-a"},
+      "response": {"active": null, "fellBack": true, "others": []}
+    }
+  ],
+  "invalid": [
+    {
+      "name": "duplicateId",
+      "request": {
+        "repositories": [
+          {"path": "/w/a", "id": "a", "name": "a", "role": "nested"},
+          {"path": "/w/b", "id": "a", "name": "a", "role": "nested"}
+        ]
+      }
+    },
+    {
+      "name": "duplicatePath",
+      "request": {
+        "repositories": [
+          {"path": "/w/a", "id": "a", "name": "a", "role": "nested"},
+          {"path": "/w/a", "id": "b", "name": "b", "role": "nested"}
+        ]
+      }
+    },
+    {
+      "name": "twoWorkspaceRepositories",
+      "request": {
+        "repositories": [
+          {"path": "/w", "id": ".", "name": "w", "role": "workspace"},
+          {"path": "/", "id": "..", "name": "/", "role": "workspace"}
+        ]
+      }
+    },
+    {
+      "name": "absoluteId",
+      "request": {"repositories": [{"path": "/w/a", "id": "/w/a", "name": "a", "role": "nested"}]}
+    },
+    {
+      "name": "backslashId",
+      "request": {"repositories": [{"path": "C:/w/a", "id": "a\\b", "name": "a\\b", "role": "nested"}]}
+    },
+    {
+      "name": "emptyName",
+      "request": {"repositories": [{"path": "/w/a", "id": "a", "name": "", "role": "nested"}]}
+    },
+    {
+      "name": "emptyPick",
+      "request": {"repositories": [], "selected": ""}
+    },
+    {
+      "name": "unknownRole",
+      "request": {"repositories": [{"path": "/w/a", "id": "a", "name": "a", "role": "submodule"}]}
+    },
+    {
+      "name": "unknownField",
+      "request": {"repositories": [], "active": "a"}
+    }
+  ]
+}

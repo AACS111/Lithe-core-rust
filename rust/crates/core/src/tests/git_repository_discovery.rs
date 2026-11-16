@@ -66,6 +66,23 @@ fn canonical(root: &Path) -> String {
         .replace('\\', "/")
 }
 
+fn folder_name(root: &Path) -> String {
+    canonical(root).rsplit('/').next().unwrap().to_owned()
+}
+
+/// Role, ID and name of every discovered repository, in discovery order.
+fn identities(root: &Path) -> Vec<(String, String, String)> {
+    data("workspace.repositories", json!({"root": root}))["repositories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            let field = |name: &str| entry[name].as_str().unwrap().to_owned();
+            (field("role"), field("id"), field("name"))
+        })
+        .collect()
+}
+
 fn fixture() -> Value {
     serde_json::from_str(include_str!(
         "../../../../fixtures/workspace/repository-visibility-v1.json"
@@ -172,7 +189,10 @@ fn discovery_respects_explicit_depth_limits() {
             "workspace.repositories",
             json!({"root": root, "maxDepth": 0})
         )["repositories"],
-        json!([{"path": canonical(&root)}])
+        json!([{
+            "path": canonical(&root), "id": ".",
+            "name": folder_name(&root), "role": "workspace"
+        }])
     );
 }
 
@@ -186,4 +206,42 @@ fn discovery_does_not_follow_directory_symlinks() {
     std::os::unix::fs::symlink(&outside.0, root.join("external")).unwrap();
     std::os::unix::fs::symlink(&root, root.join("cycle")).unwrap();
     assert_eq!(discover(&root), vec![canonical(&root)]);
+}
+
+#[test]
+fn discovery_keys_repositories_by_their_place_relative_to_the_opened_folder() {
+    let owned =
+        |role: &str, id: &str, name: &str| (role.to_owned(), id.to_owned(), name.to_owned());
+    let workspace = Workspace::new();
+    // A folder outside every repository has no workspace repository; each nested
+    // one is keyed and named by its path below the folder.
+    workspace.initialize("backend");
+    workspace.initialize("frontend/web");
+    assert_eq!(
+        identities(&workspace.0),
+        vec![
+            owned("nested", "backend", "backend"),
+            owned("nested", "frontend/web", "frontend/web"),
+        ]
+    );
+
+    // A folder inside a repository reaches the enclosing repository through `..`
+    // segments, and that repository keeps its own folder name.
+    let enclosing = workspace.initialize("mono");
+    let opened = enclosing.join("packages").join("app");
+    fs::create_dir_all(&opened).unwrap();
+    workspace.initialize("mono/packages/app/vendor/lib");
+    assert_eq!(
+        identities(&opened),
+        vec![
+            owned("workspace", "../..", &folder_name(&enclosing)),
+            owned("nested", "vendor/lib", "vendor/lib"),
+        ]
+    );
+
+    // The repository at the opened folder is the workspace repository with ID `.`.
+    assert_eq!(
+        identities(&enclosing)[0],
+        owned("workspace", ".", &folder_name(&enclosing))
+    );
 }

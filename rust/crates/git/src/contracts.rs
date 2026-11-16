@@ -10,6 +10,28 @@ pub struct WorkspaceRepositoryResponse {
     /// Windows paths are plain drive or UNC paths without the verbatim `\\?\`
     /// prefix that canonicalization adds.
     pub path: String,
+    /// Portable identity relative to the opened folder with `/` separators: `.` for
+    /// the folder itself, `a/b` below it, and `..` segments for an enclosing
+    /// repository. Commands that key repositories by ID take this value.
+    pub id: String,
+    /// Label the views show: the root folder's name for the workspace repository,
+    /// and the ID for a nested one, so two nested folders with the same name stay
+    /// distinguishable. It is a file name, never translated.
+    pub name: String,
+    /// How the repository relates to the opened folder.
+    pub role: WorkspaceRepositoryRole,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// How a discovered repository relates to the opened folder.
+pub enum WorkspaceRepositoryRole {
+    /// Contains the opened folder: the folder itself or an enclosing repository. At
+    /// most one repository has this role and it is listed first; an opened folder
+    /// outside every repository has none.
+    Workspace,
+    /// Lies below the opened folder.
+    Nested,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -1152,3 +1152,66 @@ fn git_workspace_changelist_guard_checks_newly_staged_directory_members_and_over
     );
     assert!(repo.0.join("dir/new.txt").exists());
 }
+
+fn bound_ids(prepared: &Value) -> Vec<String> {
+    prepared["session"]["plan"]["repositories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|binding| binding["id"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn git_workspace_commit_binds_discovered_nested_repositories_outside_scopes_and_retries() {
+    let repo = repository("workspace-commit-discovered");
+    let child = repo.0.join("libs/B");
+    init(&child);
+    let gone = repo.0.join("gone");
+    init(&gone);
+    staged_file(&repo.0, "parent.txt", "one");
+    staged_file(&child, "child.txt", "one");
+    let discovered = request(&repo.0, "workspace.repositories", json!({}));
+    assert_eq!(discovered["ok"], true, "{discovered}");
+    let discovered = discovered["data"]["repositories"].clone();
+    fs::remove_dir_all(&gone).unwrap();
+    let own = json!([{"id": ".", "root": repo.0}]);
+
+    // Core binds the nested entries; the removed one is skipped, and the workspace
+    // entry is the host's own binding.
+    let prepared = prepare_workspace_with(
+        &repo.0,
+        &[(".", &repo.0)],
+        json!({"workspaceRepositories": discovered}),
+    );
+    assert_eq!(bound_ids(&prepared), [".", "libs/B"], "{prepared}");
+
+    // A path-scoped commit acts only on the repositories the host bound.
+    let scoped = prepare_workspace_with(
+        &repo.0,
+        &[(".", &repo.0)],
+        json!({"workspaceRepositories": discovered,
+            "pathScope": {"include": true, "paths": {".": ["parent.txt"]}}}),
+    );
+    assert_eq!(bound_ids(&scoped), ["."], "{scoped}");
+
+    // A retry keeps the previous plan's repositories instead of gaining new ones.
+    let first = prepare_workspace_with(&repo.0, &[(".", &repo.0)], json!({}));
+    let mut retry = first["session"]["plan"].clone();
+    retry["repositories"] = own;
+    retry["previous"] = first["session"].clone();
+    retry["workspaceRepositories"] = discovered.clone();
+    let retried = request(&repo.0, "git.workspaceCommitPrepare", retry);
+    assert_eq!(retried["ok"], true, "{retried}");
+    assert_eq!(bound_ids(&retried["data"]), ["."], "{retried}");
+
+    let mut invalid = discovered;
+    invalid[0]["id"] = json!("/absolute");
+    let rejected = request(
+        &repo.0,
+        "git.workspaceCommitPrepare",
+        json!({"repositories": [{"id": ".", "root": repo.0}], "message": "batch",
+            "includeParentReferences": false, "workspaceRepositories": invalid}),
+    );
+    assert_eq!(rejected["error"]["code"], "invalid_request", "{rejected}");
+}
