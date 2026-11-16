@@ -2109,7 +2109,7 @@ as `provider: "build.provider"` with `extensions.build`. The reference contains
 raw `userArguments`, never an executable, environment, or cached classpath.
 Every restart re-resolves the enabled instance/model and sends a fresh preparation.
 Missing plugins/targets/models fail explicitly; there is no command fallback.
-Saving and running work before detector-generated Run configurations exist.
+Saving and running work before Run configurations are generated.
 See `fixtures/build-providers/build-provider-run-preparation.plugin.json`
 and `fixtures/build-providers/build-run-preparation.json`.
 

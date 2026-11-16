@@ -704,7 +704,7 @@ pub enum RunConfigCommand {
     Inspect,
     /// Reads effective saved tool paths for one Provider root (`runConfig.projectToolchain`).
     ProjectToolchain,
-    /// Regenerates detected run configurations (`runConfig.generate`).
+    /// Regenerates the provider run configurations (`runConfig.generate`).
     Generate,
     /// Formats argument vectors as reversible editor text (`runConfig.argumentText`).
     ArgumentText,

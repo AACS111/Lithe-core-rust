@@ -697,7 +697,7 @@ or removing a command fails until the table changes in the same commit.
 | `lsp.destroyServer` | Remove a terminal session handle from the registry |
 | `runConfig.inspect` | Inspect `.lithe` run documents, versions, and staleness without writing files |
 | `runConfig.projectToolchain` | Read saved project tool paths for one Provider root, with the nearest path override |
-| `runConfig.generate` | Regenerate detected run configurations |
+| `runConfig.generate` | Regenerate the provider run configurations |
 | `runConfig.argumentText` | Format a batch of exact argument vectors as reversible editor text |
 | `runConfig.resolve` | Merge generated, project, and local layers and return diagnostics |
 | `runConfig.selectContextConfiguration` | Choose a matching effective configuration for a provider-supplied source and entry identity |
@@ -3441,78 +3441,43 @@ stored paths or documents fail without changing source bytes. The command does
 not discover, probe or run any tool, inspect project descriptors, or write files.
 
 `runConfig.inspect` also returns the local document-level `toolchain`, including
-when no generated configuration exists (`status: "missing"`). Settings,
-toolchain-only callers, and initial run-panel presentation may send
-`checkFingerprint: false` to validate documents without traversing or hashing
-project sources. Omission preserves full inspection. The Windows run panel
-publishes readable configurations first, then performs full inspection and
-reports freshness failures without discarding those configurations.
-The input fingerprint covers what generation reads: the manifests the built-in
-detectors consume (package and lock files, Compose files, Procfiles, task-runner
-files and runtime version files) by content (`sha256:<hex>` in
-`generator.inputs`), plus the detector revision. When the stored inputs no longer
-reproduce the stored fingerprint, the document came from another generator
-revision and the diagnostic says so instead of listing modified files.
-Automatic run discovery, fingerprint traversal and Node manifest discovery use
-Core's shared scan policy. Known caches/build outputs
-are pruned before descending; other hidden source directories remain visible and
-symlinks are not followed. Automatic run discovery and `build.detect` search at
-most 6 levels and also prune directories Git ignores, using the `.gitignore`
-files they pass and the `info/exclude` of each repository whose root lies in the
-workspace (a linked worktree reads the main repository's shared one); a nested
-repository starts its own rules. Nothing above the workspace root is read, nor
-`core.excludesFile` or the index. `build.detect` additionally prunes the
-workspace's ignored paths (see the Build table below), which decide before Git's
-rules. Fingerprint traversal and Node manifest
-discovery keep ignored directories. Failure to read the workspace root is an error. An
-unreadable optional child or fingerprint input is recorded in
-`generator.unreadablePaths`; generation retains previous configurations and input
-hashes beneath those unknown paths. Inspection returns `incompleteProjectScan`
-instead of claiming fingerprint freshness or inferred removals when either the
-current scan or saved baseline is incomplete. The persisted diagnostic also appears
-with `checkFingerprint: false`; a successful complete regeneration clears it.
+when no generated configuration exists (`status: "missing"`).
 Project environment saves use the existing local `runConfig.updateOptions`
 toolchain payload with an empty `configurationId`; service overrides are untouched.
 
 The `runConfig.*` commands implement the versioned project protocol described
-by the JSON Schemas in this directory. `runConfig.inspect` accepts `root` and
-optional `checkFingerprint`, `localDocument` and `providerRuns`, and never
-writes files. `runConfig.generate` accepts `root`, optional `providerRuns` and
-an optional `cacheDirectory`, and returns `{ generated, toolchainRequirements,
-entryCount }`.
+by the JSON Schemas in this directory. Core discovers no runnable entries
+itself: every generated configuration is a run that a build provider plugin
+declares (`buildSystems[].run`), and each provider names the inputs that make its
+model stale through `sync.watch`. `runConfig.inspect` accepts `root` and
+optional `localDocument` and `providerRuns`, and never writes files.
+`runConfig.generate` accepts `root` and optional `providerRuns`, and returns
+`{ generated, entryCount }`.
 
-`runConfig.generate` and `runConfig.inspect` also accept optional `providerRuns`:
-a complete list of `{projectPath,name,reference}`. The native host matches current
-model targets against enabled public run declarations; `reference` has exactly the
-`extensions.build` selector shape below, with empty model `userArguments`. Core validates
-at most 10,000 unique selectors, provider-root/project containment and bounded labels,
-then creates `build.provider` entries without interpreting target IDs, tool names,
-frameworks, commands or debug adapters. An explicit `[]` withdraws generated runs;
-omission preserves older callers.
+`providerRuns` is a complete list of `{projectPath,name,reference}`. The host
+matches current model targets against enabled public run declarations;
+`reference` has exactly the `extensions.build` selector shape below, with empty
+model `userArguments`. Core validates at most 10,000 unique selectors,
+provider-root/project containment and bounded labels, then creates
+`build.provider` entries without interpreting target IDs, tool names,
+frameworks, commands or debug adapters. Generating without `providerRuns` is
+the same as `[]`: the generated layer is empty.
 IDs hash plugin/build/root/run/project/target identity, so changed labels or execution
 kind retain user overrides. Current declarations still validate the execution kind
 before preparation. `generator.providerRunFingerprint` hashes the complete sorted
-snapshot; changed or missing metadata yields `staleProviderModel`, including when
-file fingerprinting is disabled. Withdrawn entries cannot be restored from cached
-configurations; unmatched overrides stay in their user-owned layer and are diagnosed.
-See `fixtures/run-configuration/build-provider-stable-identities.json`. macOS supplies this
-snapshot; Windows retains its existing generator until its Provider host is migrated.
+snapshot; when `runConfig.inspect` receives `providerRuns` and the generated layer
+was made from a different snapshot, it reports `staleProviderModel`. Withdrawn
+entries cannot be restored from an earlier generation; unmatched overrides stay in
+their user-owned layer and are diagnosed.
+See `fixtures/run-configuration/build-provider-stable-identities.json`.
 
-Generation keeps the generated configuration and toolchain requirement
-documents in memory as the workspace's detected layer for `inspect` and
-`resolve`; nothing is written into the workspace. With `cacheDirectory` (an
-application cache root outside the workspace) it also records the result under
-`run-configurations/`, so retained entries keep their IDs and the Run list is
-complete before providers answer again; failing to read or write that cache
-changes nothing else. The previous generation, used only to retain entries
-beneath unreadable paths, is this process's last generation, else the cached
-result, else read-only a `.lithe/run/generated.json` that older versions wrote.
-`inspect` returns `requiresGeneration: true` while this process has
-no detected layer. Hosts identify the workspace when this flag is true or the
-status is `missing`; a saved provider task can make `status` be `ready` before
-detection, and must not suppress discovery of the remaining entries. Generated
-fingerprints include both project inputs and the detector revision; either
-changing marks the detected layer stale and requires regeneration.
+Generation keeps the generated document in memory as the workspace's generated
+layer for `inspect` and `resolve`; nothing is written into the workspace or a
+cache, and the `.lithe/run/generated.json` that older versions wrote is not read.
+`inspect` returns `requiresGeneration: true` while this process has no generated
+layer. Hosts generate when this flag is true or the status is `missing`; a saved
+provider task can make `status` be `ready` before generation, and must not
+suppress generation of the remaining entries.
 
 `runConfig.decideTitleAction { action, trigger, currentFileChosen, settled, configuration? }`
 decides what a press on the title bar's Run or Debug button does. `action` is
@@ -3541,54 +3506,38 @@ Windows compares paths case-insensitively and treats both separators alike;
 case-sensitive hosts compare the supplied path exactly. Discovery remains with
 the provider, and clients must reject results made stale by workspace changes.
 
-`runConfig.resolve` accepts `root`, optional local `toolchainCandidates`, and
-optional `localDocument` / `teamDocument`. A supplied document replaces that layer
+`runConfig.resolve` accepts `root` and optional `localDocument` / `teamDocument`.
+A supplied document replaces that layer
 for this read-only resolution; omitted layers come from `.lithe/run/local.json` /
 `.lithe/run/configurations.json`. Hosts can preflight a complete two-file transaction
-against the current detected layer without publishing either file. Core never writes
+against the current generated layer without publishing either file. Core never writes
 these documents; hosts still own source-identity checks, cancellation, conditional
 publication and readback. It merges
 configurations by stable ID using this precedence:
-`local.json > configurations.json > detected layer`. Scalars and arrays are
+`local.json > configurations.json > generated layer`. Scalars and arrays are
 replaced by the higher layer, while toolchain maps merge by key. It returns
 effective configurations, their source, the default (the team default from
-`.lithe/project.json`, else the first detected service, else the first
-detected entry other than Current File), structured
-diagnostics for stale, orphaned, missing, disabled, and toolchain mismatch
-states, the effective global `toolchain`, and the machine-local
-`localToolchains` document. Toolchain diagnostics carry the affected run
-configuration ID when a requirement is consumed by one or more configurations;
-requirements with no configuration consumer do not emit a blocking diagnostic.
+`.lithe/project.json`, else the first generated service, else the first
+generated entry other than Current File), structured diagnostics for orphaned
+overrides, missing working directories, disabled entries and an unavailable
+default, the effective global `toolchain`, and the machine-local
+`localToolchains` document. Core does not match toolchain versions or vendors.
 
 Each configuration carries a `category` of `project` or `infrastructure`.
-Docker Compose detections are `infrastructure`: a Compose file in an application
-repository declares the databases and brokers the project runs against, not the
-project itself. The field is omitted for `project`, which is the default, so
-existing generated documents keep their exact shape. Hosts present
-infrastructure apart from the project's own services and must not include it in
-"run all services" or in the default service selection.
-
-Windows implements this grouping. During the macOS transition, Compose entries
-remain in its execution-based Services scope; category-based grouping and service
-selection filtering are pending there.
+`infrastructure` marks the external services the project runs against, such as
+a database or a message broker, rather than the project itself. Generated
+provider entries are `project`; a saved configuration may declare
+`infrastructure`. The field is omitted for `project`, which is the default.
+Hosts present infrastructure apart from the project's own services and must not
+include it in "run all services" or in the default service selection.
 
 Display names that repeat are qualified by Core, because hosts show the name
-alone: the first candidate that separates every entry in the group wins, trying
-the working directory (when it is not the workspace root), then the source
-manifest. Three
-Compose files each declaring `compose up` become `compose up (script/docker)`
-and so on, while a name that occurs once is never decorated. Ids are unaffected.
+alone: when the working directories of the repeated entries all differ and none
+is the workspace root, each name gains its directory, so two modules declaring
+`serve` become `serve (services/api)` and `serve (services/worker)`. Otherwise
+the names stay as they are, and a name that occurs once is never decorated. Ids
+are unaffected.
 
-A process detector declares a runtime binding only when that command genuinely
-consumes the runtime. npm, pnpm, and Yarn scripts consume `project-node`; Bun
-scripts keep their independent `bun` command and do not acquire a Node
-requirement. Go, Python, and Cargo remain command-based until every host
-provides the corresponding configurable runtime registry, so their PATH-based
-launch behavior is not blocked by an unavailable platform selector.
-During resolution, Core also reconciles npm, pnpm, and Yarn commands from older
-v2 generated documents with the same `project-node` binding. This compatibility
-normalization is based on the effective command, does not mutate the stored
-document, and keeps legacy hybrid projects scoped without requiring regeneration.
 The document-level `toolchain` object in the local layer holds generic
 `preferences`; other fields there belong to whichever host or plugin wrote them,
 and Core preserves them unchanged.
@@ -3617,8 +3566,8 @@ entry also makes a team-only workspace runnable before generation, while still r
 When generation contains that selector, resolution suppresses its duplicate automatic
 entry, retains all explicitly saved configurations, and resolves defaults through the
 same effective selector. Local selector patches update the effective claim, so an
-older team target does not accidentally hide a different auto entry. Detection
-fingerprints and the detected document remain unchanged by user-layer resolution.
+older team target does not accidentally hide a different auto entry. The
+generated layer and its fingerprint remain unchanged by user-layer resolution.
 See `fixtures/run-configuration/build-provider-stable-identities.json`.
 
 The platform guards the source snapshot, atomically writes only the local layer,
@@ -3714,9 +3663,8 @@ writing, or post-save reload failed; a reload failure keeps the last usable UI
 snapshot and states that the documents were already saved.
 
 Automatic runtime discovery produces an effective executable path for the
-current session. Platforms use that same path both to construct
-`toolchainCandidates` and to resolve the launch command. An automatic path is
-not a persisted user selection and is written to `.lithe/toolchains/local.json`
+current session. Platforms use that same path to resolve the launch command.
+An automatic path is not a persisted user selection and is written to `.lithe/toolchains/local.json`
 only after an explicit editor save.
 On Windows, Node-backed commands resolve their package-manager shim from the
 selected Node installation. They do not fall back to a PATH shim from another
@@ -4711,6 +4659,19 @@ as `build.checkToolVersion.request.output`, because some tools print their
 version to stderr. The definition's `version.pattern` alone captures the
 version, including any tool-specific numbering such as a legacy `1.` prefix;
 Core never branches on a tool name.
+
+`build.detect` walks the workspace with Core's shared scan policy. It searches at
+most 6 levels and does not follow symlinks. It skips the directories the
+default visibility rules hide (Core's own folders and the folder names enabled
+plugins declare) and the directories Git ignores, using the `.gitignore` files
+it passes and the `info/exclude` of each repository whose root lies in the
+workspace (a linked worktree reads the main repository's shared one); a nested
+repository starts its own rules. Nothing above the workspace root is read, nor
+`core.excludesFile` or the index. The workspace's ignored paths (see
+`build.detect` below) decide before Git's rules. Failure to read the workspace
+root fails detection, and so does a remote link that drops during the scan; a
+deeper directory that cannot be read contributes nothing, and the scan lists at
+most 4,000 directories.
 
 Paths in requests are workspace-relative with `/` unless named absolute.
 `root` is the instance root from detection. Selected entities are
