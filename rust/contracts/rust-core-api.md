@@ -4807,17 +4807,19 @@ themselves. It reads no file and starts no process.
   `nodes` holds the instance's nodes, then the root projects.
 - `query` (at most 256 bytes, no control characters) is trimmed and matched
   case-insensitively against `label`, `detail` and `tooltip`. A matching node
-  is kept whole with the nodes on the way to it, an unmatched `dependencies`
-  node is dropped, and a `tests` node is always kept because its entries load
-  later. A blank query, or one the single root project matches, keeps
-  everything.
+  is kept whole, with `matched: true`, and with the nodes on the way to it, so
+  a host opens those and shows the match as the user left it; an unmatched
+  `dependencies` node is dropped, and a `tests` node is always kept because
+  its entries load later. A blank query, or one the single root project
+  matches, keeps everything; the matching `project` then carries
+  `matched: true`.
 - A node is `{ kind, key, label?, detail?, tooltip?, group?, projectID?,
-  targetID?, taskID?, children? }`, `kind` one of `project`, `folder`, `task`,
-  `targets`, `target`, `dependencies`, `tests`. `key` is opaque, unique in the
-  instance and stable across reloads and filters, so hosts remember open nodes
-  by it. `projectID` and `targetID` are what a task runs on (absent: the whole
-  instance); `taskID` is a declared task's ID or a model task's ID.
-  `targets`, `dependencies` and `tests` nodes have no label.
+  targetID?, taskID?, matched?, children? }`, `kind` one of `project`,
+  `folder`, `task`, `targets`, `target`, `dependencies`, `tests`. `key` is
+  opaque, unique in the instance and stable across reloads and filters, so
+  hosts remember open nodes by it. `projectID` and `targetID` are what a task
+  runs on (absent: the whole instance); `taskID` is a declared task's ID or a
+  model task's ID. `targets`, `dependencies` and `tests` nodes have no label.
 - The model may hold at most 2,000 projects and 10,000 targets and 10,000
   tasks; more is `invalid_request`, as are unknown request fields and group
   headings that are blank, longer than 120 bytes or contain control

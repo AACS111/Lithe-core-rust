@@ -64,9 +64,11 @@ fn model_tree_keeps_every_node_when_the_root_project_matches() {
     let case = &fixture["cases"][0];
     let mut request = case["request"].clone();
     request["query"] = json!(" APP ");
+    let mut expected = case["expected"].clone();
+    expected["project"]["matched"] = json!(true);
     assert_eq!(
         tree(&fixture["manifest"], &case["buildSystemID"], &request),
-        case["expected"]
+        expected
     );
 }
 

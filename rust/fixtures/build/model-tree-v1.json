@@ -893,6 +893,7 @@
                 "label": "api",
                 "detail": "core/api",
                 "projectID": "nested:core/api/api",
+                "matched": true,
                 "children": [
                   {
                     "kind": "folder",
@@ -1103,6 +1104,7 @@
             "key": "p\u001fnested:app\u001fg\u001fverification",
             "label": "Verification",
             "group": "verification",
+            "matched": true,
             "children": [
               {
                 "kind": "task",
@@ -1125,6 +1127,7 @@
                 "key": "p\u001fnested:core/core\u001fg\u001fverification",
                 "label": "Verification",
                 "group": "verification",
+                "matched": true,
                 "children": [
                   {
                     "kind": "task",
@@ -1147,6 +1150,7 @@
                     "key": "p\u001fnested:core/api/api\u001fg\u001fverification",
                     "label": "Verification",
                     "group": "verification",
+                    "matched": true,
                     "children": [
                       {
                         "kind": "task",
@@ -1173,6 +1177,7 @@
                 "key": "p\u001fnested:web/web\u001fg\u001fverification",
                 "label": "Verification",
                 "group": "verification",
+                "matched": true,
                 "children": [
                   {
                     "kind": "task",
@@ -1353,6 +1358,7 @@
                     "tooltip": "example.com/app/web/server",
                     "projectID": "nested:web/web",
                     "targetID": "nested:web/server/application/server",
+                    "matched": true,
                     "children": [
                       {
                         "kind": "task",
@@ -1875,7 +1881,8 @@
                     "key": "p\u001fflat:x\u001fg\u001fbuild\u001ft\u001fassemble",
                     "label": "Assemble",
                     "projectID": "flat:x",
-                    "taskID": "assemble"
+                    "taskID": "assemble",
+                    "matched": true
                   }
                 ]
               }
@@ -1899,7 +1906,8 @@
                     "key": "p\u001fflat:y\u001fg\u001fbuild\u001ft\u001fassemble",
                     "label": "Assemble",
                     "projectID": "flat:y",
-                    "taskID": "assemble"
+                    "taskID": "assemble",
+                    "matched": true
                   }
                 ]
               }

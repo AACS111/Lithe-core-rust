@@ -157,6 +157,10 @@ struct TreeNode {
     /// A declared task's ID or a model task's ID.
     #[serde(rename = "taskID", skip_serializing_if = "String::is_empty")]
     task_id: String,
+    /// True on a node the query matches itself, so the host opens the nodes
+    /// on the way to it and shows the match as the user left it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    matched: bool,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     children: Vec<TreeNode>,
 }
@@ -173,6 +177,7 @@ impl TreeNode {
             project_id: String::new(),
             target_id: String::new(),
             task_id: String::new(),
+            matched: false,
             children: Vec::new(),
         }
     }
@@ -194,7 +199,7 @@ pub(crate) fn model_tree(
         left: MAX_NODES,
         truncated: false,
     };
-    let (project, nodes) = match index.roots.as_slice() {
+    let (mut project, nodes) = match index.roots.as_slice() {
         &[root] => (
             index.project_node(root, &mut budget),
             index.contents(Some(root), true, &mut budget),
@@ -202,7 +207,10 @@ pub(crate) fn model_tree(
         _ => (None, index.contents(None, true, &mut budget)),
     };
     let query = request.query.trim().to_lowercase();
-    let unfiltered = query.is_empty() || project.as_ref().is_some_and(|node| node.matches(&query));
+    if let Some(node) = project.as_mut() {
+        node.matched = !query.is_empty() && node.matches(&query);
+    }
+    let unfiltered = query.is_empty() || project.as_ref().is_some_and(|node| node.matched);
     let tree = ModelTree {
         project,
         nodes: if unfiltered {
@@ -215,15 +223,19 @@ pub(crate) fn model_tree(
     Ok(serde_json::to_value(tree).expect("a model tree serializes"))
 }
 
-/// Keeps the nodes that match `query`, each with its whole subtree, and the
-/// nodes on the way to them. Dependencies are loaded by the host, so their
-/// node stays only inside a match; tests are filtered by the host, so their
-/// node always stays.
+/// Keeps the nodes that match `query`, marked and each with its whole
+/// subtree, and the nodes on the way to them. Dependencies are loaded by the
+/// host, so their node stays only inside a match; tests are filtered by the
+/// host, so their node always stays.
 fn filter(nodes: Vec<TreeNode>, query: &str) -> Vec<TreeNode> {
     nodes
         .into_iter()
         .filter_map(|mut node| {
-            if node.kind == NodeKind::Tests || node.matches(query) {
+            if node.kind == NodeKind::Tests {
+                return Some(node);
+            }
+            if node.matches(query) {
+                node.matched = true;
                 return Some(node);
             }
             if node.kind == NodeKind::Dependencies {
