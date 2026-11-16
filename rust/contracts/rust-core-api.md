@@ -769,8 +769,9 @@ or removing a command fails until the table changes in the same commit.
 | `git.historyLocate` | Append bounded history pages until one commit is found and report the budget, window cursor, and exhaustion |
 | `git.branchNamePreview` | Clean and validate a new branch name against already loaded references without running Git |
 | `git.repositoryColorAssignments` | Assign color slots to a bounded page of ordered repository identities |
-| `git.workspaceRepositorySelection` | Choose the workspace repository a view acts on and the others it lists for switching, from discovery entries and the previous pick |
+| `git.workspaceRepositorySelection` | Choose the workspace repository, or the set of repositories, a view acts on and the others it lists for switching, from discovery entries and the previous pick |
 | `git.workspaceChangeGroups` | Group every workspace repository's status changes, plan each group's and the workspace line's staging, and report what a listed ancestor records for a submodule |
+| `git.workspaceHistoryMerge` | Interleave the loaded history pages of several workspace repositories into one stable newest-first list with collision-safe commit keys, and name the repositories whose next page it waits on |
 | `git.updatePlan` | Route a branch Update and gate a Pull from facts the host collected: blockers, strategy default, whether to ask, and the expected checkout |
 | `git.historyWindow` | Plan a history refresh window, page merge, and selection retention over commit identities |
 | `git.graphProjection` | Project a loaded history window into commit-graph lanes, color IDs, routes, print elements, and labels, optionally filtered |
@@ -2041,11 +2042,46 @@ for an empty list; `fellBack` is `true` only when `selected` was given and is no
 longer listed, so the view drops state that belonged to it such as an open
 history cursor or a reference filter; `others` are the remaining IDs in
 discovery order, the groups the branch popup and the Git Log list for switching.
+A view that acts on several repositories at once, such as a Git Log that shows
+the histories of a chosen set in one list, sends `chosen`, the IDs it picked
+before in any order, instead of `selected`; an empty list is no pick. The
+response then also carries `chosen`: the listed picks in discovery order, or
+`[active]` when none is listed (`[]` for an empty workspace). `active` is the
+first of them, `others` are every ID outside them, and `fellBack` is `true` when
+any pick is no longer listed. Without `chosen` in the request the response has
+no `chosen` field.
 The list holds at most 10,000 entries. An ID that is empty, longer than 4,096
 bytes, starts with `/`, or contains `\` or NUL, an empty path or name, a repeated
 ID or path, more than one `workspace` role, an unknown role, an empty `selected`,
-or an unknown field fails with `invalid_request`. See
+both `selected` and `chosen`, a `chosen` ID that is invalid or repeated, or an
+unknown field fails with `invalid_request`. See
 `rust/fixtures/git/workspace-repository-selection-v1.json`.
+
+`git.workspaceHistoryMerge` is pure. It accepts `{ repositories }`, the
+repositories a log walks in the order the view lists them, each
+`{ id, commits, complete }`: `id` is the `workspace.repositories` ID, `commits`
+are every commit loaded so far in the order Git walked them as
+`{ hash, parentHashes?, timestamp? }` (`timestamp` is the `git.historyPage`
+`dateUnixSeconds`), and `complete` is `true` once no page is left. The response
+is `{ entries, pending }`. `entries` is the merged list newest first, each
+`{ repository, index, key, parentKeys }`: `repository` indexes the request's
+`repositories`, `index` that repository's `commits`. Each repository keeps its
+own order; among the next commits of the repositories the newest timestamp goes
+first, a commit without one takes the timestamp placed before it in its
+repository, and equal timestamps go in request order. The merge stops as soon as
+a repository that is not `complete` has no loaded commit left, because its next
+page may hold a newer commit than every one still unplaced; `pending` lists those
+repositories' indices in request order, and is empty when every loaded commit is
+placed and no page is left. A view loads the next page of each pending repository
+and asks again; the earlier entries stay the same, so rows only grow at the end.
+`key` is the commit's hash, except that a hash more than one repository names,
+as a commit or as a parent, is keyed `<hash>@<id>` in each of them; `parentKeys`
+apply the same rule, so `git.graphProjection` laid out over the keys never joins
+two repositories. At most 10,000 repositories and 20,000 commits in total are
+accepted. An invalid or repeated `id`, a hash or parent that is not 1 to 64
+hexadecimal digits, a commit repeated within one repository, a missing
+`complete`, or an unknown field fails with `invalid_request`. See
+`rust/fixtures/git/workspace-history-merge-v1.json`.
 
 `git.workspaceChangeGroups` is pure and validates `repositories` the same way;
 each entry also carries `changes`, the `git.status` changes read for that
