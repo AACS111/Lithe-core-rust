@@ -101,6 +101,48 @@
         "reference": "Editor#save(int)#L8",
         "source": "symbol"
       }
+    },
+    {
+      "name": "nullable-children-from-go-document-symbol",
+      "request": {
+        "path": "/workspace/DemoClass.java",
+        "line": 0,
+        "utf16Column": 0,
+        "symbols": [
+          {
+            "name": "DemoClass",
+            "kind": 5,
+            "detail": null,
+            "tags": null,
+            "containerName": null,
+            "children": null,
+            "range": {
+              "start": {
+                "line": 0,
+                "utf16Column": 0
+              },
+              "end": {
+                "line": 1,
+                "utf16Column": 0
+              }
+            },
+            "selectionRange": {
+              "start": {
+                "line": 0,
+                "utf16Column": 0
+              },
+              "end": {
+                "line": 0,
+                "utf16Column": 4
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "reference": "DemoClass#L1",
+        "source": "symbol"
+      }
     }
   ]
 }
