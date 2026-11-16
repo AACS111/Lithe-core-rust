@@ -123,6 +123,7 @@ impl RuntimeSession {
                         method: request.method,
                         document_uri: None,
                         document_version: None,
+                        hover: None,
                         created_at: now,
                         deadline: now + timeout,
                     },
@@ -206,6 +207,7 @@ impl RuntimeSession {
                     method: lithe_lsp_client::keymap_provider::IMPORT_METHOD.to_string(),
                     document_uri: None,
                     document_version: None,
+                    hover: None,
                     created_at: now,
                     deadline: now + timeout,
                 },
@@ -275,6 +277,7 @@ impl RuntimeSession {
                     method: lithe_lsp_client::toolchain_provider::QUERY_METHOD.to_string(),
                     document_uri: None,
                     document_version: None,
+                    hover: None,
                     created_at: now,
                     deadline: now + timeout,
                 },
@@ -349,6 +352,7 @@ impl RuntimeSession {
                     method: planned.method.to_string(),
                     document_uri: None,
                     document_version: None,
+                    hover: None,
                     created_at: now,
                     deadline: now + timeout,
                 },
@@ -439,6 +443,7 @@ impl RuntimeSession {
                     method: lithe_plugin_rpc::INVOKE_METHOD.to_string(),
                     document_uri: None,
                     document_version: None,
+                    hover: None,
                     created_at: now,
                     deadline: now + timeout,
                 },
@@ -518,7 +523,7 @@ impl RuntimeSession {
     ) -> Result<bool, CoreError> {
         let outbound_order = self.lock_outbound_order()?;
         let message = {
-            let state = self.lock_state()?;
+            let mut state = self.lock_state()?;
             if self.plugin_id.is_none() {
                 return Err(CoreError::new(
                     ErrorCode::InvalidRequest,
@@ -540,6 +545,7 @@ impl RuntimeSession {
             if !delivered {
                 return Ok(false);
             }
+            state.hover_cache.clear();
             json_rpc_notification(&notification.method, notification.params)?
         };
         self.send_messages_or_fail(&outbound_order, vec![message], "hostNotify")?;
@@ -633,6 +639,7 @@ impl RuntimeSession {
         }
         let message = json_rpc_notification(&request.method, request.params)?;
         let outbound_order = self.lock_outbound_order()?;
+        self.lock_state()?.hover_cache.clear();
         self.send_messages_or_fail(&outbound_order, vec![message], "pluginServerNotify")?;
         Ok(true)
     }
@@ -701,6 +708,38 @@ impl RuntimeSession {
                 }
             }
 
+            let mut hover = None;
+            if request.operation == LspSemanticOperation::Hover
+                && requested_kind == PendingKind::Feature
+            {
+                let open_version = uri
+                    .as_deref()
+                    .and_then(|uri| state.client.open_documents.get(uri))
+                    .map(|document| document.version)
+                    .filter(|version| *version > 0);
+                if let (Some(document_uri), Some(version), Some(position)) =
+                    (uri.as_deref(), open_version, request.position)
+                {
+                    let position = (position.line, position.utf16_column);
+                    if let Some(result) = state.hover_cache.lookup(document_uri, version, position)
+                    {
+                        push_request_event(
+                            self,
+                            &mut state,
+                            &operation_id,
+                            method,
+                            Some(result),
+                            None,
+                        );
+                        return Ok(());
+                    }
+                    hover = Some(state.hover_cache.request(version, position));
+                }
+            }
+            if request.operation == LspSemanticOperation::ExecuteCommand {
+                state.hover_cache.clear();
+            }
+
             let pending_kind = requested_kind;
             let response = match request.operation {
                 LspSemanticOperation::WorkspaceSymbols => {
@@ -765,6 +804,7 @@ impl RuntimeSession {
                         .and_then(|uri| state.client.open_documents.get(uri))
                         .map(|document| document.version)
                 }),
+                hover,
                 created_at: now,
                 deadline: now + state.request_timeout,
             };

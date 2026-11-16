@@ -46,6 +46,7 @@ impl RuntimeSession {
                         method: "shutdown".to_string(),
                         document_uri: None,
                         document_version: None,
+                        hover: None,
                         created_at: now,
                         deadline: now + shutdown_timeout,
                     },

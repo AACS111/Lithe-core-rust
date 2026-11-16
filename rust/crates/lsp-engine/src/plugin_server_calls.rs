@@ -66,6 +66,9 @@ pub(crate) fn plugin_server_timeout(requested: Option<u64>) -> Duration {
 
 /// Allocates the JSON-RPC request of an admitted operation and records it as
 /// pending. Returns the messages to write and the request ID.
+///
+/// A backend's request can be a command that changes what the server knows, and
+/// its method alone does not say whether it is, so kept hovers are forgotten.
 pub(crate) fn register_plugin_server_request(
     state: &mut SessionState,
     operation_id: &str,
@@ -74,6 +77,7 @@ pub(crate) fn register_plugin_server_request(
     created_at: Instant,
     deadline: Instant,
 ) -> Result<(Vec<String>, String), CoreError> {
+    state.hover_cache.clear();
     let response = allocate_raw_request(state.client.clone(), method, params)?;
     let request_id = (response.state.next_request_id - 1).to_string();
     state.client = response.state;
@@ -85,6 +89,7 @@ pub(crate) fn register_plugin_server_request(
             method: method.to_string(),
             document_uri: None,
             document_version: None,
+            hover: None,
             created_at,
             deadline,
         },

@@ -61,6 +61,8 @@
 
 宿主拥有语言服务器进程的生命周期、LSP 会话，以及在提供者被停用时停止进程。
 
+宿主在一次 LSP 会话里保留语言服务器的悬浮提示答案，在同一个符号上再次停留时不必再等服务器。保留的答案用于请求时的文档版本和位置；答案的 `range` 在请求所在行上且包含请求位置时，范围内的其他位置也用它。每个会话最多保留 32 个答案，先丢最久没用的。空答案、错误、文本超过 64 KiB 的答案，以及在清空之后才到达的答案都不保留，照常交付，下次重新请求。文档打开、修改、保存或关闭，工作区文件在磁盘上变化，设置或索引排除项变化，运行命令，插件后端向服务器发 `languageServer/request` 或 `languageServer/notify`、宿主向插件后端发通知，服务器向客户端发任何请求或结束一项 `$/progress`，以及会话停止时，宿主清空所有保留的答案。悬浮提示因其他原因变化的服务器，用请求（例如刷新）或结束一项进度来告知。完整规则见[契约](../../contract/v1/README.md#language-servers)。
+
 #### 宿主集成（`hostIntegration`）
 
 `hostIntegration` 是保留字段。Core 不实现任何宿主集成，也不按语言 ID、服务器 ID 或工具名走特殊逻辑；语言在启动之外需要的一切，都由插件自己的后端、提供者和声明给出。声明任何 `hostIntegration` ID 都返回 `plugin.integration.unsupported`，字段为 `languageServers[<n>].hostIntegration.id`。
@@ -310,6 +312,8 @@ The rules for `id`, `fileExtensions`, `fileNames`, `projectFileNames`, and `depe
 | `requestMethods`, `commands`, `serializedCommands`, `forwardNotifications`, `state`, `remote` | What the backend may ask of the running server and how the host keeps its state; see "Plugin-owned sessions". |
 
 The host owns the language server process lifecycle, the LSP session, and stopping the process when the provider is disabled.
+
+The host keeps a language server's hover answers for the life of its LSP session, so resting on the same symbol again does not wait for the server. A kept answer is shown for the document version and position it was asked for, and for other positions inside the answer's `range` when that range lies on the requested line and contains the requested position. A session keeps at most 32 answers, dropping the least recently used first. Empty answers, errors, answers with more than 64 KiB of text, and answers that arrive after a clear are delivered but not kept. Every kept answer is forgotten when a document opens, changes, is saved or closes; a workspace file changes on disk; settings or indexing exclusions change; a command runs; a plugin backend sends `languageServer/request` or `languageServer/notify`, or the host notifies a plugin backend; the server sends the client any request or ends a `$/progress` report; and when the session stops. A server whose hover changes for any other reason announces it with a request, such as a refresh, or by ending a progress report. The full rules are in [the contract](../../contract/v1/README.md#language-servers).
 
 #### Host integrations (`hostIntegration`)
 

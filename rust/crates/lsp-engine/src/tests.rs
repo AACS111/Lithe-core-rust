@@ -326,6 +326,17 @@ impl Harness {
 
     /// Issues a feature request and returns its opaque operation ID.
     fn request(&self, operation: LspSemanticOperation, uri: &str) -> String {
+        self.request_at(operation, uri, 0, 0)
+    }
+
+    /// Issues a feature request at a position and returns its opaque operation ID.
+    fn request_at(
+        &self,
+        operation: LspSemanticOperation,
+        uri: &str,
+        line: i64,
+        utf16_column: i64,
+    ) -> String {
         let operation_id = self.engine.next_operation_id();
         self.session()
             .request(
@@ -335,10 +346,7 @@ impl Harness {
                     operation_id: Some(operation_id.clone()),
                     operation,
                     uri: Some(uri.to_string()),
-                    position: Some(LspPosition {
-                        line: 0,
-                        utf16_column: 0,
-                    }),
+                    position: Some(LspPosition { line, utf16_column }),
                     new_name: None,
                     range: None,
                     diagnostics: Vec::new(),
@@ -353,6 +361,74 @@ impl Harness {
             )
             .expect("a ready session should accept the request");
         operation_id
+    }
+
+    /// Number of `textDocument/hover` requests written so far. Requests are
+    /// written before `request` returns, so this needs no waiting.
+    fn hover_requests(&self) -> usize {
+        self.server
+            .messages()
+            .iter()
+            .filter(|message| {
+                message.get("method").and_then(Value::as_str) == Some("textDocument/hover")
+                    && message.get("id").is_some()
+            })
+            .count()
+    }
+
+    /// Hovers at a position of `HOVER_URI`, asserts the server was asked, and
+    /// answers with `reply` (an object holding `result` or `error`). Returns the
+    /// completion the host receives.
+    fn answer_hover(&mut self, line: i64, column: i64, reply: Value) -> LspRuntimeEvent {
+        let asked = self.hover_requests();
+        let operation = self.request_at(LspSemanticOperation::Hover, HOVER_URI, line, column);
+        assert_eq!(
+            self.hover_requests(),
+            asked + 1,
+            "the hover at {line}:{column} should reach the server"
+        );
+        let id = self
+            .server
+            .await_request_at("textDocument/hover", asked)
+            .expect("the hover request should be recorded");
+        let mut message = json!({ "jsonrpc": "2.0", "id": id });
+        for (key, value) in reply.as_object().expect("a reply is an object") {
+            message[key] = value.clone();
+        }
+        self.server.send(message);
+        self.await_event(|event| {
+            event.kind == "requestCompleted" && event.operation_id.as_deref() == Some(&operation)
+        })
+        .clone()
+    }
+
+    /// Hovers at a position of `HOVER_URI` and asserts the answer was kept: the
+    /// server is not asked and the host already has the completion.
+    fn hover_from_cache(&mut self, line: i64, column: i64) -> LspRuntimeEvent {
+        let asked = self.hover_requests();
+        let operation = self.request_at(LspSemanticOperation::Hover, HOVER_URI, line, column);
+        assert_eq!(
+            self.hover_requests(),
+            asked,
+            "the hover at {line}:{column} should be answered without the server"
+        );
+        self.poll();
+        self.events
+            .iter()
+            .find(|event| {
+                event.kind == "requestCompleted"
+                    && event.operation_id.as_deref() == Some(&operation)
+            })
+            .cloned()
+            .expect("a kept hover completes before the request returns")
+    }
+
+    /// Hovers at a position of `HOVER_URI` and asserts the server was asked
+    /// again, leaving that request unanswered.
+    fn hover_asks_server(&mut self, line: i64, column: i64, why: &str) {
+        let asked = self.hover_requests();
+        self.request_at(LspSemanticOperation::Hover, HOVER_URI, line, column);
+        assert_eq!(self.hover_requests(), asked + 1, "{why}");
     }
 
     /// The recorded JSON-RPC message with the given request ID.
@@ -5665,4 +5741,290 @@ mod plugin_owned_server {
         // A host-owned server has no backend, so it cannot have a policy.
         assert!(refused(None, metals_policy(false)));
     }
+}
+
+/// Document every hover-cache test rests on.
+const HOVER_URI: &str = "file:///workspace/main.go";
+const HOVER_TEXT: &str = "package main\nfunc main() {}\n";
+
+/// A ready session that saves with text, runs commands, and has `HOVER_URI`
+/// and `file:///workspace/other.go` open.
+fn hover_harness() -> Harness {
+    let mut harness = Harness::start(|_| {});
+    let mut capabilities = ready_capabilities();
+    capabilities["textDocumentSync"] = json!({ "change": 1, "save": { "includeText": true } });
+    capabilities["executeCommandProvider"] = json!({ "commands": ["source.fix"] });
+    harness.server.complete_initialize(capabilities);
+    harness.await_state(LspLifecycleState::Ready);
+    harness.sync(HOVER_URI, HOVER_TEXT);
+    harness.sync("file:///workspace/other.go", "package main\n");
+    harness
+}
+
+/// The server's answer for `func main()`, over `main` on line one.
+fn main_hover() -> Value {
+    json!({ "result": {
+        "contents": { "kind": "markdown", "value": "```go\nfunc main()\n```" },
+        "range": { "start": { "line": 1, "character": 5 }, "end": { "line": 1, "character": 9 } }
+    }})
+}
+
+fn hover_contents(event: &LspRuntimeEvent) -> Option<&str> {
+    event.result.as_ref()?.pointer("/hover/contents")?.as_str()
+}
+
+/// Issue #1995: resting on a symbol again must not wait for the server again.
+#[test]
+fn a_kept_hover_answers_its_position_and_range_without_asking_again() {
+    let mut harness = hover_harness();
+    let first = harness.answer_hover(1, 6, main_hover());
+    assert_eq!(hover_contents(&first), Some("```go\nfunc main()\n```"));
+
+    let again = harness.hover_from_cache(1, 6);
+    assert_eq!(again.result, first.result);
+    assert_eq!(again.method, first.method);
+    assert!(again.error.is_none());
+    // Every column of the answered range shows the same answer.
+    assert_eq!(harness.hover_from_cache(1, 5).result, first.result);
+    assert_eq!(harness.hover_from_cache(1, 8).result, first.result);
+    harness.hover_asks_server(1, 9, "the range ends before column 9");
+    harness.hover_asks_server(0, 6, "another line is another symbol");
+}
+
+#[test]
+fn a_range_over_several_lines_or_elsewhere_answers_only_the_requested_position() {
+    let mut harness = hover_harness();
+    harness.answer_hover(
+        0,
+        2,
+        json!({ "result": {
+            "contents": "package main",
+            "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 1, "character": 4 } }
+        }}),
+    );
+    harness.hover_from_cache(0, 2);
+    harness.hover_asks_server(0, 3, "a multi-line range can enclose other symbols");
+    harness.hover_asks_server(1, 0, "a multi-line range can enclose other symbols");
+
+    harness.answer_hover(
+        1,
+        0,
+        json!({ "result": {
+            "contents": "func",
+            "range": { "start": { "line": 1, "character": 5 }, "end": { "line": 1, "character": 9 } }
+        }}),
+    );
+    harness.hover_from_cache(1, 0);
+    harness.hover_asks_server(
+        1,
+        6,
+        "a range that misses the request describes something else",
+    );
+}
+
+#[test]
+fn an_empty_failed_or_oversized_hover_is_asked_for_again() {
+    let mut harness = hover_harness();
+    let oversized = "x".repeat(HOVER_CACHE_MAX_CONTENT_BYTES + 1);
+    let replies = [
+        json!({ "result": null }),
+        json!({ "result": { "contents": "" } }),
+        json!({ "result": { "contents": " \n " } }),
+        json!({ "result": { "contents": [] } }),
+        json!({ "error": { "code": -32801, "message": "content modified" } }),
+        json!({ "result": { "contents": oversized } }),
+    ];
+    for reply in replies {
+        // `answer_hover` asserts that each of these asks the server again.
+        let completion = harness.answer_hover(1, 6, reply);
+        assert!(completion.result.is_some() || completion.error.is_some());
+    }
+    let oversized_answer = harness
+        .events
+        .iter()
+        .rev()
+        .find(|event| event.kind == "requestCompleted")
+        .unwrap();
+    assert_eq!(
+        hover_contents(oversized_answer).map(str::len),
+        Some(HOVER_CACHE_MAX_CONTENT_BYTES + 1),
+        "an oversized answer is still delivered"
+    );
+    harness.hover_asks_server(1, 6, "an oversized answer is not kept");
+}
+
+#[test]
+fn anything_that_can_change_what_the_server_knows_forgets_kept_hovers() {
+    type Invalidation = Box<dyn Fn(&mut Harness)>;
+    let other = "file:///workspace/other.go";
+    let cases: Vec<(&str, Invalidation)> = vec![
+        (
+            "editing another document",
+            Box::new(move |harness| harness.sync(other, "package main\n\nvar edited = 1\n")),
+        ),
+        (
+            "saving",
+            Box::new(|harness| {
+                let saved = harness
+                    .session()
+                    .save_document(SaveDocumentRequest {
+                        session_id: harness.session_id.clone(),
+                        uri: HOVER_URI.to_string(),
+                        text: HOVER_TEXT.to_string(),
+                    })
+                    .unwrap();
+                assert!(saved);
+            }),
+        ),
+        (
+            "closing and reopening at the same version",
+            Box::new(|harness| {
+                harness.session().close_document(HOVER_URI).unwrap();
+                harness.sync(HOVER_URI, HOVER_TEXT);
+                assert_eq!(harness.snapshot().open_documents[HOVER_URI].version, 1);
+            }),
+        ),
+        (
+            "a file changing on disk",
+            Box::new(move |harness| {
+                harness
+                    .session()
+                    .workspace_files_changed(vec![WorkspaceFileChange {
+                        uri: "file:///workspace/go.mod".to_string(),
+                        kind: WorkspaceFileChangeKind::Changed,
+                    }])
+                    .unwrap();
+            }),
+        ),
+        (
+            "running a command",
+            Box::new(|harness| {
+                let operation_id = harness.engine.next_operation_id();
+                harness
+                    .session()
+                    .request(
+                        SemanticRequest {
+                            query: None,
+                            session_id: harness.session_id.clone(),
+                            operation_id: Some(operation_id.clone()),
+                            operation: LspSemanticOperation::ExecuteCommand,
+                            uri: None,
+                            position: None,
+                            new_name: None,
+                            range: None,
+                            diagnostics: Vec::new(),
+                            completion_context: None,
+                            completion_item: None,
+                            code_action: None,
+                            command: Some(json!({ "title": "Fix", "command": "source.fix" })),
+                            formatting_options: None,
+                            include_declaration: None,
+                        },
+                        operation_id,
+                    )
+                    .unwrap();
+            }),
+        ),
+        (
+            "a request from the server",
+            Box::new(|harness| {
+                harness
+                    .session()
+                    .handle_server_message(
+                        json!({
+                            "jsonrpc": "2.0", "id": "progress-token",
+                            "method": "window/workDoneProgress/create",
+                            "params": { "token": "load" }
+                        })
+                        .to_string(),
+                    )
+                    .unwrap();
+            }),
+        ),
+        (
+            "the end of a piece of server work",
+            Box::new(|harness| {
+                harness
+                    .session()
+                    .handle_server_message(
+                        json!({
+                            "jsonrpc": "2.0", "method": "$/progress",
+                            "params": { "token": "load", "value": { "kind": "end" } }
+                        })
+                        .to_string(),
+                    )
+                    .unwrap();
+            }),
+        ),
+    ];
+    let mut harness = hover_harness();
+    for (name, invalidate) in cases {
+        harness.answer_hover(1, 6, main_hover());
+        harness.hover_from_cache(1, 6);
+        invalidate(&mut harness);
+        harness.hover_asks_server(1, 6, &format!("{name} must forget kept hovers"));
+    }
+}
+
+#[test]
+fn progress_reports_and_other_documents_hovers_keep_kept_hovers() {
+    let mut harness = hover_harness();
+    harness.answer_hover(1, 6, main_hover());
+    harness
+        .session()
+        .handle_server_message(
+            json!({
+                "jsonrpc": "2.0", "method": "$/progress",
+                "params": { "token": "load", "value": { "kind": "report", "message": "1/9" } }
+            })
+            .to_string(),
+        )
+        .unwrap();
+    // Repeating the synchronized text changes nothing on the server.
+    harness.sync(HOVER_URI, HOVER_TEXT);
+    harness.request_at(
+        LspSemanticOperation::Hover,
+        "file:///workspace/other.go",
+        0,
+        0,
+    );
+    harness.hover_from_cache(1, 6);
+}
+
+/// The server may have computed an answer from what it knew before a change it
+/// was told about while the request was in flight.
+#[test]
+fn a_hover_answered_across_an_invalidation_is_delivered_but_not_kept() {
+    let mut harness = hover_harness();
+    let operation = harness.request_at(LspSemanticOperation::Hover, HOVER_URI, 1, 6);
+    let id = harness
+        .server
+        .await_request_at("textDocument/hover", 0)
+        .unwrap();
+    harness
+        .session()
+        .workspace_files_changed(vec![WorkspaceFileChange {
+            uri: "file:///workspace/go.mod".to_string(),
+            kind: WorkspaceFileChangeKind::Changed,
+        }])
+        .unwrap();
+    let mut answer = main_hover();
+    answer["jsonrpc"] = json!("2.0");
+    answer["id"] = json!(id);
+    harness.server.send(answer);
+    let completion = harness
+        .await_event(|event| {
+            event.kind == "requestCompleted" && event.operation_id.as_deref() == Some(&operation)
+        })
+        .clone();
+    assert_eq!(hover_contents(&completion), Some("```go\nfunc main()\n```"));
+    harness.hover_asks_server(1, 6, "an answer from before the change is not kept");
+}
+
+#[test]
+fn an_edit_to_the_hovered_document_asks_again_at_its_new_version() {
+    let mut harness = hover_harness();
+    harness.answer_hover(1, 6, main_hover());
+    harness.sync(HOVER_URI, "package main\nfunc main() { println() }\n");
+    harness.hover_asks_server(1, 6, "an edit changes the hovered text");
 }

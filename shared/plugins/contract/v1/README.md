@@ -313,6 +313,23 @@ process is the same kind of process: it declares `launch`, `arguments`,
 `validationArguments`, `runtimeDependencies`, and `initializationOptions` with
 the same meaning and validation; see [Build providers](#build-providers).
 
+The host keeps a language server's hover answers for the life of its LSP
+session, so resting on the same symbol again does not wait for the server. A
+kept answer is shown for the document version and position it was asked for,
+and for any other position inside the answer's `range` when that range lies on
+the requested line and contains the requested position. A session keeps at most
+32 answers and drops the least recently used one first. The host never keeps an
+empty answer, an error, an answer with more than 64 KiB of text, or an answer
+that arrives after the kept answers were forgotten; each of these is delivered
+and asked for again next time. Every kept answer is forgotten when a document
+opens, changes, is saved or closes; a workspace file changes on disk; settings or
+indexing exclusions change; a command runs; a plugin backend sends
+`languageServer/request` or `languageServer/notify` to the server, or the host
+sends a notification to a plugin backend; the server sends the client any
+request or ends a `$/progress` report; and when the session stops. A server
+whose hover changes for any other reason announces it with a request, such as a
+refresh, or by ending a progress report.
+
 
 #### Language server host integrations
 
