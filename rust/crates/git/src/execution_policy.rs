@@ -1,5 +1,6 @@
 //! Request-scoped execution choices and deterministic temporary configuration.
 
+use super::console::QueryCategory;
 use super::fetch::GitFetchOptions;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
@@ -21,11 +22,18 @@ pub struct GitExecutionOptions {
     pub detailed_fetch: bool,
     /// Explicit operation provenance; unknown requests must never be deduplicated.
     pub source: super::console::Source,
-    /// Internal read-only queries emit execution events like visible commands, so a console
-    /// records what the workbench read, except under `background` provenance: automatic
-    /// refreshes and watchers run too often to record. Authentication and interactivity stay
-    /// with visible commands; a query never prompts.
-    pub report_queries: bool,
+    /// The query categories a console records: their internal read-only queries emit
+    /// execution events like visible commands. Empty by default, as IDEA leaves every
+    /// read-only handler silent. Authentication and interactivity stay with visible commands;
+    /// a query never prompts.
+    pub console_queries: Vec<QueryCategory>,
+    /// What the request's queries read, named by the host for reads the request command
+    /// alone does not tell apart, such as a reload after an operation.
+    pub query_category: Option<QueryCategory>,
+    /// The request command's own category, which the dispatcher installs with
+    /// [`GitExecutionOptions::for_command`]; it is never read from the request.
+    #[serde(skip)]
+    pub command_category: Option<QueryCategory>,
 }
 impl Default for GitExecutionOptions {
     fn default() -> Self {
@@ -36,8 +44,17 @@ impl Default for GitExecutionOptions {
             fetch_defaults: GitFetchOptions::default(),
             detailed_fetch: false,
             source: super::console::Source::Unknown,
-            report_queries: false,
+            console_queries: Vec::new(),
+            query_category: None,
+            command_category: None,
         }
+    }
+}
+impl GitExecutionOptions {
+    /// These options for a request of `command`, whose queries default to its category.
+    pub fn for_command(mut self, command: &str) -> Self {
+        self.command_category = super::console::category::of_command(command);
+        self
     }
 }
 
@@ -81,6 +98,32 @@ pub(super) fn source() -> super::console::Source {
         super::console::Source::Unknown => lithe_request_context::trace::current().source,
         source => source,
     }
+}
+
+/// The category of the running request's internal queries: the one the host named, or else
+/// the request command's. A `background` request without a named category is an automatic
+/// refresh or watcher, whose queries belong to no category.
+pub(super) fn query_category() -> Option<QueryCategory> {
+    let options = current();
+    options.query_category.or_else(|| {
+        (source() != super::console::Source::Background)
+            .then_some(options.command_category)
+            .flatten()
+    })
+}
+
+/// Whether the running request's internal queries are recorded: their category is one the
+/// console records. Queries of no category, those of an automatic refresh or watcher, run too
+/// often to record.
+pub(super) fn reports_queries() -> bool {
+    query_category().is_some_and(|category| current().console_queries.contains(&category))
+}
+
+/// Whether the running request's unrecorded queries still report a failure: a request that
+/// is not `background`, as every such query did before the console chose categories.
+/// Background refreshes and watchers stay silent even when a read fails.
+pub(super) fn reports_query_failures() -> bool {
+    source() != super::console::Source::Background
 }
 
 /// Environment configuration and scope provenance require Git 2.31 or newer.
@@ -250,5 +293,51 @@ mod tests {
             ..Default::default()
         }))
         .is_err());
+    }
+
+    /// The shared cases fix each command's category and which queries a console records.
+    #[test]
+    fn console_queries_follow_the_named_or_command_category() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../fixtures/git/console-queries-v1.json"
+        ))
+        .unwrap();
+        // Hosts read the whole list from the fixture. The match fails to compile when a
+        // category is added, so the list cannot fall behind the enum.
+        use super::super::console::QueryCategory::*;
+        let categories: Vec<super::super::console::QueryCategory> =
+            serde_json::from_value(fixture["queryCategories"].clone()).unwrap();
+        let positions = categories.iter().map(|category| match category {
+            References => 0,
+            Reload => 1,
+            DiffRefresh => 2,
+            Diff => 3,
+            Log => 4,
+            LogPathFilter => 5,
+            Annotate => 6,
+            Panels => 7,
+            Checks => 8,
+        });
+        assert!(positions.eq(0..9), "{categories:?}");
+        for (command, category) in fixture["categories"].as_object().unwrap() {
+            assert_eq!(
+                serde_json::json!(super::super::console::category::of_command(command)),
+                *category,
+                "{command}"
+            );
+        }
+        for case in fixture["cases"].as_array().unwrap() {
+            let options: GitExecutionOptions =
+                serde_json::from_value(case["gitExecution"].clone()).unwrap();
+            let _scope =
+                Scope::begin(Some(options.for_command(case["command"].as_str().unwrap()))).unwrap();
+            assert_eq!(
+                reports_queries(),
+                case["reported"].as_bool().unwrap(),
+                "{}",
+                case["name"]
+            );
+        }
+        assert!(!reports_queries());
     }
 }

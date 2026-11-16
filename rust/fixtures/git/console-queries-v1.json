@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "queryCategories": [
+    "references",
+    "reload",
+    "diffRefresh",
+    "diff",
+    "log",
+    "logPathFilter",
+    "annotate",
+    "panels",
+    "checks"
+  ],
+  "categories": {
+    "git.diff": "diff",
+    "git.comparison": "diff",
+    "git.history": "log",
+    "git.references": "log",
+    "git.commitFiles": "log",
+    "git.blame": "annotate",
+    "git.lineHistory": "annotate",
+    "git.worktrees": "panels",
+    "git.stashes": "panels",
+    "git.pullRequestContext": "panels",
+    "git.checkoutPreflight": "checks",
+    "git.write": "checks",
+    "git.status": "checks",
+    "project.search": null
+  },
+  "cases": [
+    {
+      "name": "IDEA defaults record no query",
+      "command": "git.history",
+      "gitExecution": {},
+      "reported": false
+    },
+    {
+      "name": "a recorded category reports the command's queries",
+      "command": "git.history",
+      "gitExecution": { "consoleQueries": ["log"] },
+      "reported": true
+    },
+    {
+      "name": "another category stays silent",
+      "command": "git.diff",
+      "gitExecution": { "consoleQueries": ["log"] },
+      "reported": false
+    },
+    {
+      "name": "unlisted Git commands are checks",
+      "command": "git.checkoutPreflight",
+      "gitExecution": { "consoleQueries": ["checks"] },
+      "reported": true
+    },
+    {
+      "name": "a background refresh without a named category stays silent",
+      "command": "git.status",
+      "gitExecution": { "consoleQueries": ["checks"], "source": "background" },
+      "reported": false
+    },
+    {
+      "name": "a named category replaces the command's",
+      "command": "git.history",
+      "gitExecution": { "consoleQueries": ["log"], "queryCategory": "reload" },
+      "reported": false
+    },
+    {
+      "name": "a named background category is recorded when the console records it",
+      "command": "git.references",
+      "gitExecution": {
+        "consoleQueries": ["references"],
+        "queryCategory": "references",
+        "source": "background"
+      },
+      "reported": true
+    },
+    {
+      "name": "commands outside Git have no category",
+      "command": "project.search",
+      "gitExecution": { "consoleQueries": ["checks"] },
+      "reported": false
+    }
+  ]
+}

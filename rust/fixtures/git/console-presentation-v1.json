@@ -100,7 +100,7 @@
             "id": "one",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -2234,7 +2234,7 @@
             "id": "one",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -2340,7 +2340,7 @@
             "id": "one",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -3220,7 +3220,7 @@
             "id": "0",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           },
           {
             "command": [
@@ -3253,7 +3253,7 @@
             "id": "1",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -3356,7 +3356,7 @@
             "id": "a",
             "output": [],
             "repositoryLabel": "/workspace/a/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           },
           {
             "command": [
@@ -3381,7 +3381,7 @@
             "id": "b",
             "output": [],
             "repositoryLabel": "/workspace/b/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -3724,7 +3724,7 @@
             "id": "before",
             "output": [],
             "repositoryLabel": "/workspace/one/project",
-            "notice": "completedWithoutOutput"
+            "notice": null
           },
           {
             "command": [
@@ -3741,7 +3741,7 @@
             "id": "after",
             "output": [],
             "repositoryLabel": "/workspace/one/project",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -3776,36 +3776,65 @@
       }
     },
     {
-      "name": "IDEA progress folding uses a contiguous block and leaves diagnostics visible",
+      "name": "IDEA progress folding uses a contiguous block longer than ten lines and leaves diagnostics visible",
       "input": {
-        "search": "Counting",
         "records": [
           {
             "id": "progress",
             "root": "/workspace/repository",
             "arguments": [
               "fetch",
-              "origin",
-              "--prune"
+              "origin"
             ],
-            "state": "completed",
-            "exitCode": 0,
+            "temporaryConfig": [],
             "lines": [
               {
                 "stream": "stderr",
-                "text": "remote: Enumerating objects: 8, done."
+                "text": "remote: Enumerating objects: 120, done."
               },
               {
                 "stream": "stderr",
-                "text": "remote: Counting objects: 100% (8/8), done."
+                "text": "remote: Counting objects: 100% (120/120), done."
               },
               {
                 "stream": "stderr",
-                "text": "remote: Compressing objects: 100% (4/4), done."
+                "text": "remote: Compressing objects: 100% (60/60), done."
               },
               {
                 "stream": "stderr",
-                "text": "remote: Total 8 (delta 3), reused 8 (delta 3)"
+                "text": "Receiving objects: 10% (12/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 20% (24/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 30% (36/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 40% (48/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 50% (60/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 60% (72/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 70% (84/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 80% (96/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Resolving deltas: 100% (40/40), done."
               },
               {
                 "stream": "stderr",
@@ -3815,15 +3844,18 @@
                 "stream": "stderr",
                 "text": " abc1234..def5678 main -> origin/main"
               }
-            ]
+            ],
+            "state": "completed",
+            "exitCode": 0
           }
-        ]
+        ],
+        "search": "Counting"
       },
       "expected": {
         "folds": [
           [
             0,
-            3,
+            12,
             "progress"
           ]
         ],
@@ -3832,98 +3864,79 @@
       "presentation": {
         "entries": [
           {
+            "id": "progress",
+            "repositoryLabel": "/workspace/repository",
             "command": [
               {
-                "count": 1,
                 "id": "argument-0",
                 "kind": "text",
-                "matches": 0,
+                "text": "fetch",
                 "preview": "",
-                "text": "fetch"
+                "count": 1,
+                "matches": 0
               },
               {
-                "count": 1,
                 "id": "argument-1",
                 "kind": "text",
-                "matches": 0,
+                "text": "origin",
                 "preview": "",
-                "text": "origin"
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 12,
+                "kind": "progress",
+                "count": 12,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 1
               },
               {
-                "count": 1,
-                "id": "argument-2",
+                "id": "output-12",
+                "start": 12,
+                "end": 13,
                 "kind": "text",
-                "matches": 0,
-                "preview": "",
-                "text": "--prune"
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-13",
+                "start": 13,
+                "end": 14,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
               }
             ],
             "failed": false,
-            "id": "progress",
-            "output": [
-              {
-                "added": 0,
-                "count": 3,
-                "deleted": 0,
-                "end": 3,
-                "id": "output-0",
-                "kind": "progress",
-                "matches": 1,
-                "start": 0,
-                "updated": 0
-              },
-              {
-                "added": 0,
-                "count": 1,
-                "deleted": 0,
-                "end": 4,
-                "id": "output-3",
-                "kind": "text",
-                "matches": 0,
-                "start": 3,
-                "updated": 0
-              },
-              {
-                "added": 0,
-                "count": 1,
-                "deleted": 0,
-                "end": 5,
-                "id": "output-4",
-                "kind": "text",
-                "matches": 0,
-                "start": 4,
-                "updated": 0
-              },
-              {
-                "added": 0,
-                "count": 1,
-                "deleted": 0,
-                "end": 6,
-                "id": "output-5",
-                "kind": "text",
-                "matches": 0,
-                "start": 5,
-                "updated": 0
-              }
-            ],
-            "repositoryLabel": "/workspace/repository",
             "notice": null
           }
         ],
         "groups": [
           {
             "id": "progress",
-            "matches": 1,
             "recordIds": [
               "progress"
-            ]
+            ],
+            "matches": 1
           }
         ],
         "matches": [
           {
+            "recordId": "progress",
             "fragmentId": "output-0",
-            "lineIndex": 1,
-            "recordId": "progress"
+            "lineIndex": 1
           }
         ],
         "totalMatches": 1
@@ -4009,7 +4022,10 @@
             "exitCode": 0
           }
         ],
-        "search": ""
+        "search": "",
+        "display": {
+          "showCompletedWithoutOutput": true
+        }
       },
       "expected": {
         "notice": "completedWithoutOutput"
@@ -4144,7 +4160,10 @@
             }
           }
         ],
-        "search": ""
+        "search": "",
+        "display": {
+          "showCompletedWithoutOutput": true
+        }
       },
       "expected": {
         "notice": "completedWithoutOutput"
@@ -4213,7 +4232,10 @@
             }
           }
         ],
-        "search": ""
+        "search": "",
+        "display": {
+          "showCompletedWithoutOutput": true
+        }
       },
       "expected": {
         "notice": "completedWithoutOutput"
@@ -4450,6 +4472,1966 @@
         "matches": [],
         "totalMatches": 0
       }
+    },
+    {
+      "name": "a command without output shows no notice by default",
+      "input": {
+        "records": [
+          {
+            "id": "quiet",
+            "root": "/workspace/repository",
+            "arguments": [
+              "checkout",
+              "main"
+            ],
+            "temporaryConfig": [],
+            "lines": [],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": ""
+      },
+      "expected": {
+        "notice": null
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "quiet",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "checkout",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "main",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "quiet",
+            "recordIds": [
+              "quiet"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a query of ten lines stays visible by default",
+      "input": {
+        "records": [
+          {
+            "id": "refs",
+            "root": "/workspace/repository",
+            "arguments": [
+              "for-each-ref",
+              "--format=%(refname) %(objectname)"
+            ],
+            "temporaryConfig": [],
+            "lines": [
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-0 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-1 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-2 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-3 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-4 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-5 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-6 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-7 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-8 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-9 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              }
+            ],
+            "state": "completed",
+            "exitCode": 0,
+            "query": true
+          }
+        ],
+        "search": ""
+      },
+      "expected": {
+        "folds": []
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "refs",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "for-each-ref",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "'--format=%(refname) %(objectname)'",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 1,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-1",
+                "start": 1,
+                "end": 2,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-2",
+                "start": 2,
+                "end": 3,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-3",
+                "start": 3,
+                "end": 4,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-4",
+                "start": 4,
+                "end": 5,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-5",
+                "start": 5,
+                "end": 6,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-6",
+                "start": 6,
+                "end": 7,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-7",
+                "start": 7,
+                "end": 8,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-8",
+                "start": 8,
+                "end": 9,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-9",
+                "start": 9,
+                "end": 10,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              }
+            ],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "refs",
+            "recordIds": [
+              "refs"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a short query folds when the display asks",
+      "input": {
+        "records": [
+          {
+            "id": "rev",
+            "root": "/workspace/repository",
+            "arguments": [
+              "rev-parse",
+              "HEAD"
+            ],
+            "temporaryConfig": [],
+            "lines": [
+              {
+                "stream": "stdout",
+                "text": "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              }
+            ],
+            "state": "completed",
+            "exitCode": 0,
+            "query": true
+          }
+        ],
+        "search": "",
+        "display": {
+          "foldShortQueries": true
+        }
+      },
+      "expected": {
+        "folds": [
+          [
+            0,
+            1,
+            "query"
+          ]
+        ]
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "rev",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "rev-parse",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "HEAD",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 1,
+                "kind": "query",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              }
+            ],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "rev",
+            "recordIds": [
+              "rev"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "hidden temporary configuration keeps the operation's own configuration",
+      "input": {
+        "records": [
+          {
+            "id": "hooks",
+            "root": "/workspace/repository",
+            "arguments": [
+              "-c",
+              "core.hooksPath=/hooks",
+              "commit",
+              "-m",
+              "x"
+            ],
+            "temporaryConfig": [
+              [
+                "color.ui",
+                "false"
+              ],
+              [
+                "core.quotepath",
+                "false"
+              ]
+            ],
+            "lines": [],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": "",
+        "display": {
+          "hideTemporaryConfig": true
+        }
+      },
+      "expected": {
+        "commandFoldKinds": [
+          "configuration"
+        ],
+        "visibleCommandContains": [
+          "commit -m x"
+        ]
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "hooks",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "configuration-0",
+                "kind": "configuration",
+                "text": "-c core.hooksPath=/hooks",
+                "preview": "-c …",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-2",
+                "kind": "text",
+                "text": "commit",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-3",
+                "kind": "text",
+                "text": "-m",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-4",
+                "kind": "text",
+                "text": "x",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "hooks",
+            "recordIds": [
+              "hooks"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a hidden repository label is empty and out of search",
+      "input": {
+        "records": [
+          {
+            "id": "hidden",
+            "root": "/workspace/needle",
+            "arguments": [
+              "status"
+            ],
+            "temporaryConfig": [],
+            "lines": [],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": "needle",
+        "display": {
+          "hideRepository": true
+        }
+      },
+      "expected": {
+        "labels": [
+          ""
+        ],
+        "matches": 0
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "hidden",
+            "repositoryLabel": "",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "status",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "hidden",
+            "recordIds": [
+              "hidden"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a progress block of ten lines stays visible",
+      "input": {
+        "records": [
+          {
+            "id": "short-progress",
+            "root": "/workspace/repository",
+            "arguments": [
+              "fetch",
+              "origin"
+            ],
+            "temporaryConfig": [],
+            "lines": [
+              {
+                "stream": "stderr",
+                "text": "remote: Enumerating objects: 120, done."
+              },
+              {
+                "stream": "stderr",
+                "text": "remote: Counting objects: 100% (120/120), done."
+              },
+              {
+                "stream": "stderr",
+                "text": "remote: Compressing objects: 100% (60/60), done."
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 10% (12/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 20% (24/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 30% (36/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 40% (48/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 50% (60/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 60% (72/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 70% (84/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "From https://example.invalid/repository"
+              }
+            ],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": ""
+      },
+      "expected": {
+        "folds": []
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "short-progress",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "fetch",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "origin",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 1,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-1",
+                "start": 1,
+                "end": 2,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-2",
+                "start": 2,
+                "end": 3,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-3",
+                "start": 3,
+                "end": 4,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-4",
+                "start": 4,
+                "end": 5,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-5",
+                "start": 5,
+                "end": 6,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-6",
+                "start": 6,
+                "end": 7,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-7",
+                "start": 7,
+                "end": 8,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-8",
+                "start": 8,
+                "end": 9,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-9",
+                "start": 9,
+                "end": 10,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-10",
+                "start": 10,
+                "end": 11,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              }
+            ],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "short-progress",
+            "recordIds": [
+              "short-progress"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a query longer than ten lines folds whole",
+      "input": {
+        "records": [
+          {
+            "id": "refs",
+            "root": "/workspace/repository",
+            "arguments": [
+              "for-each-ref",
+              "--format=%(refname) %(objectname)"
+            ],
+            "temporaryConfig": [],
+            "lines": [
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-0 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-1 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-2 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-3 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-4 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-5 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-6 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-7 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-8 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-9 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              },
+              {
+                "stream": "stdout",
+                "text": "refs/heads/topic-10 4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              }
+            ],
+            "state": "completed",
+            "exitCode": 0,
+            "query": true
+          }
+        ],
+        "search": ""
+      },
+      "expected": {
+        "folds": [
+          [
+            0,
+            11,
+            "query"
+          ]
+        ]
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "refs",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "for-each-ref",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "'--format=%(refname) %(objectname)'",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 11,
+                "kind": "query",
+                "count": 11,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              }
+            ],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "refs",
+            "recordIds": [
+              "refs"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a pruning fetch keeps its configuration and progress open",
+      "input": {
+        "records": [
+          {
+            "id": "prune",
+            "root": "/workspace/repository",
+            "arguments": [
+              "fetch",
+              "--progress",
+              "--prune",
+              "origin"
+            ],
+            "temporaryConfig": [
+              [
+                "color.ui",
+                "false"
+              ]
+            ],
+            "lines": [
+              {
+                "stream": "stderr",
+                "text": "remote: Enumerating objects: 120, done."
+              },
+              {
+                "stream": "stderr",
+                "text": "remote: Counting objects: 100% (120/120), done."
+              },
+              {
+                "stream": "stderr",
+                "text": "remote: Compressing objects: 100% (60/60), done."
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 10% (12/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 20% (24/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 30% (36/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 40% (48/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 50% (60/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 60% (72/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 70% (84/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Receiving objects: 80% (96/120)"
+              },
+              {
+                "stream": "stderr",
+                "text": "Resolving deltas: 100% (40/40), done."
+              },
+              {
+                "stream": "stderr",
+                "text": "From https://example.invalid/repository"
+              },
+              {
+                "stream": "stderr",
+                "text": " abc1234..def5678 main -> origin/main"
+              },
+              {
+                "stream": "stderr",
+                "text": " - [deleted]         (none)     -> origin/topic"
+              }
+            ],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": ""
+      },
+      "expected": {
+        "folds": [],
+        "commandFoldKinds": [],
+        "visibleCommandContains": [
+          "-c color.ui=false fetch --progress --prune"
+        ]
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "prune",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "-c",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "color.ui=false",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-2",
+                "kind": "text",
+                "text": "fetch",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-3",
+                "kind": "text",
+                "text": "--progress",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-4",
+                "kind": "text",
+                "text": "--prune",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-5",
+                "kind": "text",
+                "text": "origin",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 1,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-1",
+                "start": 1,
+                "end": 2,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-2",
+                "start": 2,
+                "end": 3,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-3",
+                "start": 3,
+                "end": 4,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-4",
+                "start": 4,
+                "end": 5,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-5",
+                "start": 5,
+                "end": 6,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-6",
+                "start": 6,
+                "end": 7,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-7",
+                "start": 7,
+                "end": 8,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-8",
+                "start": 8,
+                "end": 9,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-9",
+                "start": 9,
+                "end": 10,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-10",
+                "start": 10,
+                "end": 11,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-11",
+                "start": 11,
+                "end": 12,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-12",
+                "start": 12,
+                "end": 13,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-13",
+                "start": 13,
+                "end": 14,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-14",
+                "start": 14,
+                "end": 15,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              }
+            ],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "prune",
+            "recordIds": [
+              "prune"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a deletion query is never folded",
+      "input": {
+        "records": [
+          {
+            "id": "would",
+            "root": "/workspace/repository",
+            "arguments": [
+              "clean",
+              "-n",
+              "-d"
+            ],
+            "temporaryConfig": [],
+            "lines": [
+              {
+                "stream": "stdout",
+                "text": "Would remove build/0.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/1.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/2.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/3.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/4.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/5.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/6.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/7.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/8.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/9.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/10.o"
+              },
+              {
+                "stream": "stdout",
+                "text": "Would remove build/11.o"
+              }
+            ],
+            "state": "completed",
+            "exitCode": 0,
+            "query": true
+          }
+        ],
+        "search": "",
+        "display": {
+          "foldShortQueries": true
+        }
+      },
+      "expected": {
+        "folds": []
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "would",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "clean",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "-n",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-2",
+                "kind": "text",
+                "text": "-d",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 1,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-1",
+                "start": 1,
+                "end": 2,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-2",
+                "start": 2,
+                "end": 3,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-3",
+                "start": 3,
+                "end": 4,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-4",
+                "start": 4,
+                "end": 5,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-5",
+                "start": 5,
+                "end": 6,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-6",
+                "start": 6,
+                "end": 7,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-7",
+                "start": 7,
+                "end": 8,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-8",
+                "start": 8,
+                "end": 9,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-9",
+                "start": 9,
+                "end": 10,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-10",
+                "start": 10,
+                "end": 11,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              },
+              {
+                "id": "output-11",
+                "start": 11,
+                "end": 12,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              }
+            ],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "would",
+            "recordIds": [
+              "would"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "deleting a branch shows the configuration it ran with",
+      "input": {
+        "records": [
+          {
+            "id": "delete",
+            "root": "/workspace/repository",
+            "arguments": [
+              "-c",
+              "core.hooksPath=/hooks",
+              "update-ref",
+              "-d",
+              "refs/heads/topic",
+              "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+            ],
+            "temporaryConfig": [
+              [
+                "color.ui",
+                "false"
+              ]
+            ],
+            "lines": [],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": ""
+      },
+      "expected": {
+        "commandFoldKinds": [],
+        "visibleCommandContains": [
+          "-c color.ui=false -c core.hooksPath=/hooks update-ref -d refs/heads/topic"
+        ]
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "delete",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "-c",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "color.ui=false",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-2",
+                "kind": "text",
+                "text": "-c",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-3",
+                "kind": "text",
+                "text": "core.hooksPath=/hooks",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-4",
+                "kind": "text",
+                "text": "update-ref",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-5",
+                "kind": "text",
+                "text": "-d",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-6",
+                "kind": "text",
+                "text": "refs/heads/topic",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-7",
+                "kind": "text",
+                "text": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "delete",
+            "recordIds": [
+              "delete"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    }
+  ],
+  "deletions": [
+    {
+      "arguments": [
+        "update-ref",
+        "-d",
+        "refs/heads/topic",
+        "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "-c",
+        "color.ui=false",
+        "-C",
+        "/workspace/repository",
+        "branch",
+        "-d",
+        "topic"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "branch",
+        "-D",
+        "topic"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "branch",
+        "--delete",
+        "topic"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "tag",
+        "-d",
+        "v1.0"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "symbolic-ref",
+        "--delete",
+        "refs/remotes/origin/HEAD"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "push",
+        "--delete",
+        "--",
+        "origin",
+        "refs/heads/topic"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "push",
+        "origin",
+        ":refs/heads/topic"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "push",
+        "--prune",
+        "origin",
+        "refs/heads/*:refs/heads/*"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "fetch",
+        "--progress",
+        "--all",
+        "--prune"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "fetch",
+        "-p",
+        "origin"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "fetch",
+        "--prune-tags",
+        "origin"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "pull",
+        "--prune"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "remote",
+        "remove",
+        "upstream"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "remote",
+        "rm",
+        "upstream"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "remote",
+        "prune",
+        "origin"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "remote",
+        "update",
+        "--prune"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "config",
+        "--unset",
+        "remote.origin.pushurl"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "config",
+        "--remove-section",
+        "remote.upstream"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "config",
+        "unset",
+        "user.name"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "rm",
+        "--cached",
+        "--force",
+        "--ignore-unmatch",
+        "--pathspec-from-file=-"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "clean",
+        "-f",
+        "-d",
+        "--"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "clean",
+        "-n",
+        "-d"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "stash",
+        "drop",
+        "stash@{0}"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "stash",
+        "clear"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "stash",
+        "pop",
+        "stash@{0}"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "worktree",
+        "remove",
+        "--force",
+        "/workspace/other"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "worktree",
+        "prune",
+        "--verbose",
+        "--expire=now"
+      ],
+      "deletes": true
+    },
+    {
+      "arguments": [
+        "fetch",
+        "--progress",
+        "--no-prune"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "fetch",
+        "origin"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "branch",
+        "--list",
+        "topic"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "tag",
+        "--list",
+        "--",
+        "-d"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "update-ref",
+        "refs/heads/topic",
+        "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "push",
+        "origin",
+        "main"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "push",
+        "--force-with-lease",
+        "origin",
+        "+main:main"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "remote",
+        "add",
+        "upstream",
+        "https://example.invalid/repository"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "remote",
+        "update"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "config",
+        "--get",
+        "user.name"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "stash",
+        "list"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "stash",
+        "push",
+        "--",
+        "dropped.txt"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "worktree",
+        "list",
+        "--porcelain"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "log",
+        "--",
+        "removed.txt"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [
+        "status"
+      ],
+      "deletes": false
+    },
+    {
+      "arguments": [],
+      "deletes": false
     }
   ]
 }

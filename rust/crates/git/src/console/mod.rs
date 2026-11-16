@@ -1,12 +1,14 @@
 //! Shared IDEA-style Git console folding and search over retained command text.
+pub mod category;
 mod command;
+mod deletion;
 mod output;
 #[cfg(test)]
 mod tests;
 mod types;
 use lithe_protocol::{CoreError, ErrorCode};
 use types::*;
-pub use types::{Request, Source};
+pub use types::{QueryCategory, Request, Source};
 
 /// Generates a lossless display plan from already-retained, sanitized native records.
 /// Folded ranges always refer to the input; this operation never launches a process.
@@ -54,24 +56,34 @@ pub fn present(request: Request) -> Result<Presentation, CoreError> {
         total_matches: 0,
     };
     let query = request.search.to_lowercase();
+    let display = &request.display;
     for record in &request.records {
         let previous_matches = presentation.total_matches;
+        let deletes = deletion::deletes(&record.arguments);
         let mut entry = Entry {
             id: record.id.clone(),
-            repository_label: record.root.clone(),
-            command: command::project(record),
-            output: output::project(record),
+            repository_label: if display.hide_repository {
+                String::new()
+            } else {
+                record.root.clone()
+            },
+            command: command::project(record, display, deletes),
+            output: output::project(record, display, deletes),
             failed: record.failed(),
-            notice: record.notice(),
+            notice: record.notice().filter(|notice| {
+                display.show_completed_without_output || *notice != Notice::CompletedWithoutOutput
+            }),
         };
         if !query.is_empty() {
-            add_matches(
-                &mut presentation,
-                record,
-                "repository",
-                None,
-                occurrences(&record.root, &query),
-            );
+            if !display.hide_repository {
+                add_matches(
+                    &mut presentation,
+                    record,
+                    "repository",
+                    None,
+                    occurrences(&record.root, &query),
+                );
+            }
             for fragment in &mut entry.command {
                 fragment.matches = occurrences(&fragment.text, &query);
                 add_matches(

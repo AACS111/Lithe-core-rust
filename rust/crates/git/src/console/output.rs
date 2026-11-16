@@ -1,23 +1,25 @@
 //! IDEA-style progress and query folding; ordinary command output remains continuous text.
-use super::types::{OutputFragment, Record};
+use super::types::{Display, OutputFragment, Record};
 use regex::Regex;
 use std::sync::OnceLock;
 
-pub(super) fn project(record: &Record) -> Vec<OutputFragment> {
+/// Output of at most this many lines stays visible: opening a fold would cost more than
+/// reading the lines it hides.
+const VISIBLE_LINES: usize = 10;
+
+/// Folds nothing of a command that `deletes`, so every line of a deletion stays in sight.
+pub(super) fn project(record: &Record, display: &Display, deletes: bool) -> Vec<OutputFragment> {
+    let folds = !deletes && !record.failed();
     // A query's output answers the workflow, not the user: like IDEA's silent handlers it
-    // stays out of sight, folded whole, unless the query failed or wrote a single line.
-    if record.query && record.lines.len() > 1 && !record.failed() {
-        return vec![OutputFragment {
-            id: "output-0".into(),
-            start: 0,
-            end: record.lines.len(),
-            kind: "query".into(),
-            count: record.lines.len(),
-            added: 0,
-            updated: 0,
-            deleted: 0,
-            matches: 0,
-        }];
+    // stays out of sight, folded whole, once it is longer than a glance, or at any length
+    // when the console's display choices ask.
+    let visible = if display.fold_short_queries {
+        0
+    } else {
+        VISIBLE_LINES
+    };
+    if folds && record.query && record.lines.len() > visible {
+        return vec![fragment(0, record.lines.len(), "query")];
     }
     let mut result = Vec::new();
     let mut start = 0;
@@ -29,21 +31,28 @@ pub(super) fn project(record: &Record) -> Vec<OutputFragment> {
             }
         }
         // A failed command keeps its progress and diagnostics expanded for inspection.
-        let folded = end > start + 1 && !record.failed();
-        result.push(OutputFragment {
-            id: format!("output-{start}"),
-            start,
-            end,
-            kind: if folded { "progress" } else { "text" }.into(),
-            count: end - start,
-            added: 0,
-            updated: 0,
-            deleted: 0,
-            matches: 0,
-        });
+        if folds && end - start > VISIBLE_LINES {
+            result.push(fragment(start, end, "progress"));
+        } else {
+            result.extend((start..end).map(|line| fragment(line, line + 1, "text")));
+        }
         start = end;
     }
     result
+}
+
+fn fragment(start: usize, end: usize, kind: &str) -> OutputFragment {
+    OutputFragment {
+        id: format!("output-{start}"),
+        start,
+        end,
+        kind: kind.into(),
+        count: end - start,
+        added: 0,
+        updated: 0,
+        deleted: 0,
+        matches: 0,
+    }
 }
 
 /// Matches IDEA's GitImplBase progress grammar, including remote-side phases.

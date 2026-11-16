@@ -6,11 +6,12 @@
 //! `lithe_request_context::events`. Native process ownership belongs to the
 //! `lithe-git-host` adapter.
 
-use lithe_protocol::CoreError;
+use lithe_protocol::{CoreError, ErrorCode};
 use lithe_request_context::events::{deliver, EventSink};
 pub(crate) use lithe_request_context::events::{emit, has_sink, redact};
 use serde::Serialize;
 use std::cell::Cell;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
 const MAX_LINE_BYTES: usize = 16 * 1024;
@@ -44,9 +45,13 @@ enum Kind<'a> {
         /// Native presentation folds global options without rewriting actual argv.
         display_arguments: Vec<String>,
         global_arguments: Vec<String>,
-        /// An internal query reported through `reportQueries`, as opposed to a command the
-        /// workflow runs visibly; consoles fold a query's output by default.
+        /// An internal query reported because the console records its category, as opposed
+        /// to a command the workflow runs visibly; consoles fold a query's output by default.
         query: bool,
+        /// The category of a query, so a console can drop the queries of a category it stops
+        /// recording; absent for a visible command and a query of no category.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        query_category: Option<super::console::QueryCategory>,
     },
     Output {
         invocation_id: u64,
@@ -83,20 +88,44 @@ pub(super) struct Invocation {
     /// stays visible while stdout is replaced with one explicit redaction marker.
     redact_configuration: Cell<bool>,
     configuration_marker_sent: bool,
-    /// The child is an internal query reported only because the request asked for queries.
+    /// The child is an internal query reported only because the console records its category.
     query: bool,
+    /// The events of a query the console does not record, sent only if the query fails.
+    held: Option<Held>,
+}
+/// A query outside the recorded categories reports only a failure. Its events wait here, and
+/// only on a real failure do they reach the request's consumer, before its `finished` event.
+/// Stdout is not kept: Git writes a failure's diagnostics to stderr, and a successful query
+/// then costs no serialized line of its output.
+struct Held {
+    sink: EventSink,
+    events: Arc<Mutex<Vec<String>>>,
+    transfer: Cell<bool>,
 }
 impl Invocation {
     /// The invocation that reports a child: visible commands always report, and internal
-    /// queries only when the request set `reportQueries` and is not a background refresh.
+    /// queries when the console records the request's query category. Any other query of a
+    /// request that is not `background` reports only a failure.
     pub(super) fn reported(visible: bool) -> Option<Self> {
-        use super::{console::Source, execution_policy};
-        let query = || {
-            execution_policy::current().report_queries
-                && execution_policy::source() != Source::Background
-        };
-        let mut invocation = (visible || query()).then(Self::current).flatten()?;
+        let recorded = visible || super::execution_policy::reports_queries();
+        let held = !recorded && super::execution_policy::reports_query_failures();
+        let mut invocation = (recorded || held).then(Self::current).flatten()?;
         invocation.query = !visible;
+        if held {
+            let events = Arc::new(Mutex::new(Vec::new()));
+            let buffer = events.clone();
+            let sink: EventSink = Arc::new(move |event: &str| {
+                buffer
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .push(event.to_string())
+            });
+            invocation.held = Some(Held {
+                sink: std::mem::replace(&mut invocation.sink, sink),
+                events,
+                transfer: Cell::new(false),
+            });
+        }
         Some(invocation)
     }
     /// Whether an internal query's nonzero exit answered its question, such as a missing
@@ -122,6 +151,7 @@ impl Invocation {
             redact_configuration: Cell::new(false),
             configuration_marker_sent: false,
             query: false,
+            held: None,
         })
     }
     pub(super) fn started(&self, root: &str, arguments: &[String]) {
@@ -168,7 +198,10 @@ impl Invocation {
                 "fetch" | "push" | "pull" | "clone"
             )
         });
-        lithe_request_context::events::invocation_started(self.id, transfer);
+        match &self.held {
+            Some(held) => held.transfer.set(transfer),
+            None => lithe_request_context::events::invocation_started(self.id, transfer),
+        }
         let arguments = arguments
             .iter()
             .map(|argument| redact(argument))
@@ -195,6 +228,10 @@ impl Invocation {
                 working_directory: root,
                 arguments: &arguments,
                 query: self.query,
+                query_category: self
+                    .query
+                    .then(super::execution_policy::query_category)
+                    .flatten(),
             },
         );
     }
@@ -207,6 +244,9 @@ impl Invocation {
         }
     }
     pub(super) fn output(&mut self, stream: lithe_git_host::Stream, bytes: &[u8]) {
+        if self.held.is_some() && matches!(stream, lithe_git_host::Stream::Stdout) {
+            return;
+        }
         if self.redact_configuration.get() && matches!(stream, lithe_git_host::Stream::Stdout) {
             if !bytes.is_empty() && !self.configuration_marker_sent {
                 self.configuration_marker_sent = true;
@@ -276,6 +316,20 @@ impl Invocation {
         error: Option<&CoreError>,
         expected_exit: bool,
     ) {
+        let failed = error.is_some() || !(exit_code == Some(0) || expected_exit);
+        if let Some(held) = self.held.take() {
+            // A cancelled query was superseded; like a success, it has nothing to report.
+            if !failed || error.is_some_and(|error| matches!(error.code, ErrorCode::Cancelled)) {
+                return;
+            }
+            self.sink = held.sink;
+            lithe_request_context::events::invocation_started(self.id, held.transfer.get());
+            let events =
+                std::mem::take(&mut *held.events.lock().unwrap_or_else(PoisonError::into_inner));
+            for event in events {
+                deliver(&self.sink, &event);
+            }
+        }
         if self.omitted {
             self.stdout = LineDecoder::default();
             self.stderr = LineDecoder::default();
@@ -310,7 +364,6 @@ impl Invocation {
             message: redact(&error.message),
             details: error.details.as_ref().map(|value| redact(value)),
         });
-        let failed = error.is_some() || !(exit_code == Some(0) || expected_exit);
         lithe_request_context::events::invocation_finished(self.id, failed);
         send(
             &self.sink,
@@ -570,9 +623,10 @@ mod tests {
     #[test]
     fn reported_queries_are_marked_apart_from_visible_commands() {
         let options = crate::execution_policy::GitExecutionOptions {
-            report_queries: true,
+            console_queries: vec![crate::console::QueryCategory::Log],
             ..Default::default()
-        };
+        }
+        .for_command("git.history");
         let _policy = crate::execution_policy::Scope::begin(Some(options)).unwrap();
         let events = capture_request(|| {
             request_started(Some("marked"));
@@ -587,15 +641,88 @@ mod tests {
         let marks: Vec<_> = events
             .iter()
             .filter(|event| event["type"] == "started")
-            .map(|event| (event["arguments"][0].clone(), event["query"].clone()))
+            .map(|event| {
+                (
+                    event["arguments"][0].clone(),
+                    event["query"].clone(),
+                    event.get("queryCategory").cloned(),
+                )
+            })
             .collect();
         assert_eq!(
             marks,
             [
-                (serde_json::json!("log"), serde_json::json!(true)),
-                (serde_json::json!("commit"), serde_json::json!(false))
+                (
+                    serde_json::json!("log"),
+                    serde_json::json!(true),
+                    Some(serde_json::json!("log"))
+                ),
+                (serde_json::json!("commit"), serde_json::json!(false), None)
             ]
         );
+    }
+
+    /// A query outside the recorded categories stays silent until it really fails; then the
+    /// console gets its command, its stderr and its exit, and no separate failure record.
+    #[test]
+    fn unrecorded_queries_report_only_a_real_failure() {
+        let run = |source: crate::console::Source| {
+            let options = crate::execution_policy::GitExecutionOptions {
+                source,
+                ..Default::default()
+            }
+            .for_command("git.history");
+            let _policy = crate::execution_policy::Scope::begin(Some(options)).unwrap();
+            let cancelled = CoreError::new(ErrorCode::Cancelled, "Operation was cancelled");
+            let ends: [(&[&str], Option<i32>, Option<&CoreError>); 3] = [
+                (&["log"], Some(0), None),
+                (&["log"], None, Some(&cancelled)),
+                (&["rev-parse", "HEAD"], Some(128), None),
+            ];
+            capture_request(|| {
+                request_started(Some("silent"));
+                for (arguments, exit_code, error) in ends {
+                    // A background request reports no unrecorded query at all.
+                    let Some(mut query) = Invocation::reported(false) else {
+                        continue;
+                    };
+                    let arguments = arguments.iter().map(|a| a.to_string()).collect::<Vec<_>>();
+                    query.started("/workspace", &arguments);
+                    query.output(lithe_git_host::Stream::Stdout, b"partial\n");
+                    query.output(lithe_git_host::Stream::Stderr, b"fatal: bad object\n");
+                    query.finished(exit_code, error);
+                }
+                request_finished(r#"{"ok":false,"error":{"code":"process_failed","message":"x"}}"#);
+            })
+        };
+        let events = run(crate::console::Source::User);
+        let kinds = events
+            .iter()
+            .map(|event| event["type"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            kinds,
+            [
+                "requestStarted",
+                "started",
+                "output",
+                "finished",
+                "requestFinished"
+            ]
+        );
+        assert_eq!(
+            events[1]["arguments"],
+            serde_json::json!(["rev-parse", "HEAD"])
+        );
+        assert_eq!(events[1]["query"], true);
+        assert_eq!(events[2]["stream"], "stderr");
+        assert_eq!(events[2]["text"], "fatal: bad object");
+        assert_eq!(events[3]["exitCode"], 128);
+        assert_eq!(events[4]["failureRecord"], false);
+        assert_eq!(events[4]["unconfirmedInvocations"], serde_json::json!([]));
+        let background = run(crate::console::Source::Background);
+        assert_eq!(background.len(), 2, "{background:?}");
+        assert_eq!(background[1]["failureRecord"], true);
     }
 
     #[test]
