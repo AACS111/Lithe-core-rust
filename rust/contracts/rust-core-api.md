@@ -642,6 +642,7 @@ or removing a command fails until the table changes in the same commit.
 | `lsp.classifyNavigationTarget` | Classify a language-server jump target as workspace, external read-only or rejected |
 | `lsp.declarationOrUsages` | Decide whether a go-to-declaration gesture opens the declaration or shows its usages |
 | `editor.lineEdit` | Apply a deterministic line-level text transform and return the replacement plus selection to restore |
+| `editor.copyReferenceLocation` | Format a one-based line reference from normalized document symbols; fall back to a file path when no containing symbol exists |
 | `editor.find` | Find text or plans bounded replacements in a borrowed document |
 | `editor.preferences.resolve` | Resolve persisted editor presentation preferences |
 | `editor.recent.reduce` | Reduce and queries bounded recent-file history |

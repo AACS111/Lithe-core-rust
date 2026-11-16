@@ -592,6 +592,8 @@ pub enum EditorCommand {
     /// Applies a deterministic line-level editing transform
     /// (`editor.lineEdit`).
     LineEdit,
+    /// Formats a symbol or file reference for one caret position (`editor.copyReferenceLocation`).
+    CopyReferenceLocation,
     /// Finds text or plans bounded replacements in a borrowed document (`editor.find`).
     Find,
     /// Resolves persisted editor presentation preferences (`editor.preferences.resolve`).
@@ -1313,6 +1315,9 @@ impl CoreCommand {
             "lsp.classifyNavigationTarget" => Some(Self::Lsp(LspCommand::ClassifyNavigationTarget)),
             "lsp.declarationOrUsages" => Some(Self::Lsp(LspCommand::DeclarationOrUsages)),
             "editor.lineEdit" => Some(Self::Editor(EditorCommand::LineEdit)),
+            "editor.copyReferenceLocation" => {
+                Some(Self::Editor(EditorCommand::CopyReferenceLocation))
+            }
             "editor.find" => Some(Self::Editor(EditorCommand::Find)),
             "editor.preferences.resolve" => Some(Self::Editor(EditorCommand::PreferencesResolve)),
             "editor.recent.reduce" => Some(Self::Editor(EditorCommand::RecentReduce)),
