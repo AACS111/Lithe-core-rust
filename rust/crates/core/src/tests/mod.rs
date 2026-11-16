@@ -5,7 +5,6 @@ mod build_runtime_versions;
 mod build_systems;
 mod core_request_traces;
 mod declarative_plugins;
-mod detectors;
 mod diagnostics_dispatch;
 mod directory_actions;
 mod document_uri;

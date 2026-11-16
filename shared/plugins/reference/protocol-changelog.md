@@ -133,6 +133,12 @@
 
 ## 时间线（新的在上）
 
+### 2026-11-17
+
+| PR | 修改人 | API 编号 | 协议 / 能力 | 改了什么 |
+| --- | --- | --- | --- | --- |
+| [#77](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/77) | [@xiaoyumuxi](https://github.com/xiaoyumuxi) | API-29 | `buildSystems` 0 内的说明修正 | Core 不再内置运行发现探测器（[1lck/Lithe-IDEA#1856](https://github.com/1lck/Lithe-IDEA/issues/1856) 第 4 项）：原来按 `Cargo.toml`、`go.mod`、`package.json`、`pyproject.toml`、`Makefile`、`justfile`、`Procfile`、`compose.yaml` 自己生成的 Run 配置、指纹输入和工具链要求全部删除。Run 列表里自动生成的条目只来自已启用构建插件声明的 `buildSystems[].run`，模型何时过期只由插件的 `sync.watch` 决定。插件想让项目出现在 Run 列表里，就要声明 `run`。契约 README 只改了一句措辞（不再提“探测器生成的 Run 配置”）；清单字段、校验、fixture 和能力版本都没有变，没有新增宿主方法或通知。 |
+
 ### 2026-11-16
 
 | PR | 修改人 | API 编号 | 协议 / 能力 | 改了什么 |
