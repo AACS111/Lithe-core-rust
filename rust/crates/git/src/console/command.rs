@@ -1,5 +1,5 @@
 //! Conservative command compression: behavior-changing flags always remain visible.
-use super::types::{CommandFragment, Record};
+use super::types::{CommandFragment, Display, Record};
 use crate::execution_policy::command_index;
 
 pub(super) fn quote(value: &str) -> String {
@@ -22,10 +22,13 @@ fn join(values: &[String]) -> String {
 }
 /// Fold contiguous Git configuration arguments in place, as IDEA's console does.
 /// Token boundaries preserve quoted values and avoid folding behavior flags or paths.
-pub(super) fn project(record: &Record) -> Vec<CommandFragment> {
+/// Hidden temporary configuration is left out; the arguments themselves always stay.
+pub(super) fn project(record: &Record, display: &Display) -> Vec<CommandFragment> {
     let mut args = Vec::new();
-    for (key, value) in &record.temporary_config {
-        args.extend(["-c".into(), format!("{key}={value}")]);
+    if !display.hide_temporary_config {
+        for (key, value) in &record.temporary_config {
+            args.extend(["-c".into(), format!("{key}={value}")]);
+        }
     }
     args.extend_from_slice(&record.arguments);
     let command = command_index(&args).unwrap_or(0);

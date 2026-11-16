@@ -146,7 +146,11 @@ fn execute_parsed(mut parsed: CoreRequest, document: Option<&str>) -> CoreRespon
         Ok(scope) => scope,
         Err(error) => return CoreResponse::failure(id, error),
     };
-    let _git_policy = match lithe_git::execution_policy::Scope::begin(parsed.git_execution) {
+    let _git_policy = match lithe_git::execution_policy::Scope::begin(
+        parsed
+            .git_execution
+            .map(|options| options.for_command(&parsed.command)),
+    ) {
         Ok(scope) => scope,
         Err(error) => return CoreResponse::failure(id, error),
     };

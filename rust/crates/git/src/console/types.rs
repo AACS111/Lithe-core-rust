@@ -11,6 +11,48 @@ pub struct Line {
     pub text: String,
 }
 
+/// What an internal read-only query read, which decides whether a console records it.
+/// `gitExecution.consoleQueries` lists the categories to record; none is recorded by default,
+/// as IDEA's console leaves every read-only handler silent.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryCategory {
+    /// Reference reads that follow a repository change without a user action.
+    References,
+    /// Reads that reload views after an operation the user ran.
+    Reload,
+    /// Diffs read again because a file they show was saved.
+    DiffRefresh,
+    /// File, commit, comparison and stash diffs the user opened.
+    Diff,
+    /// History, references and commit details the log shows.
+    Log,
+    /// The per-commit file lists a log path filter reads.
+    LogPathFilter,
+    /// Annotation and line history.
+    Annotate,
+    /// Lists and panels: worktrees, stashes, remotes, pull requests and settings.
+    Panels,
+    /// Previews, preflights, plans and the queries of operations themselves.
+    Checks,
+}
+
+/// Display choices of a native console's settings. Every default is IDEA's console.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+pub struct Display {
+    /// Fold a successful query's output even when it is a single line, so a query shows its
+    /// command alone.
+    pub fold_single_line_queries: bool,
+    /// Show the `completedWithoutOutput` notice; IDEA prints nothing when a command finishes.
+    pub show_completed_without_output: bool,
+    /// Omit Lithe's temporary configuration instead of folding it. `-c` arguments the
+    /// operation itself passed stay folded in place.
+    pub hide_temporary_config: bool,
+    /// Leave every entry's repository label empty and out of search.
+    pub hide_repository: bool,
+}
+
 /// Bounded native history; the presentation command performs no Git or filesystem work.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -21,6 +63,8 @@ pub struct Request {
     /// Additional workspace roots disambiguate labels even before those repositories have output.
     #[serde(default)]
     pub repository_roots: Vec<String>,
+    #[serde(default)]
+    pub(crate) display: Display,
 }
 
 /// Complete retained execution data; presentation never rewrites this input.
@@ -47,7 +91,7 @@ pub struct Record {
     #[serde(default)]
     pub truncated: bool,
     /// The `query` of the record's `started` event: an internal query the workflow reported
-    /// only because the request asked for queries. Its output is folded unless it failed.
+    /// only because the request recorded its category. Its output is folded unless it failed.
     #[serde(default)]
     pub query: bool,
 }

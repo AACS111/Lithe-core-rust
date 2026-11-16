@@ -100,7 +100,7 @@
             "id": "one",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -2234,7 +2234,7 @@
             "id": "one",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -2340,7 +2340,7 @@
             "id": "one",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -3220,7 +3220,7 @@
             "id": "0",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           },
           {
             "command": [
@@ -3253,7 +3253,7 @@
             "id": "1",
             "output": [],
             "repositoryLabel": "/workspace/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -3356,7 +3356,7 @@
             "id": "a",
             "output": [],
             "repositoryLabel": "/workspace/a/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           },
           {
             "command": [
@@ -3381,7 +3381,7 @@
             "id": "b",
             "output": [],
             "repositoryLabel": "/workspace/b/repo",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -3724,7 +3724,7 @@
             "id": "before",
             "output": [],
             "repositoryLabel": "/workspace/one/project",
-            "notice": "completedWithoutOutput"
+            "notice": null
           },
           {
             "command": [
@@ -3741,7 +3741,7 @@
             "id": "after",
             "output": [],
             "repositoryLabel": "/workspace/one/project",
-            "notice": "completedWithoutOutput"
+            "notice": null
           }
         ],
         "groups": [
@@ -4009,7 +4009,10 @@
             "exitCode": 0
           }
         ],
-        "search": ""
+        "search": "",
+        "display": {
+          "showCompletedWithoutOutput": true
+        }
       },
       "expected": {
         "notice": "completedWithoutOutput"
@@ -4144,7 +4147,10 @@
             }
           }
         ],
-        "search": ""
+        "search": "",
+        "display": {
+          "showCompletedWithoutOutput": true
+        }
       },
       "expected": {
         "notice": "completedWithoutOutput"
@@ -4213,7 +4219,10 @@
             }
           }
         ],
-        "search": ""
+        "search": "",
+        "display": {
+          "showCompletedWithoutOutput": true
+        }
       },
       "expected": {
         "notice": "completedWithoutOutput"
@@ -4443,6 +4452,399 @@
             "id": "status-notice",
             "recordIds": [
               "status-notice"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a command without output shows no notice by default",
+      "input": {
+        "records": [
+          {
+            "id": "quiet",
+            "root": "/workspace/repository",
+            "arguments": [
+              "checkout",
+              "main"
+            ],
+            "temporaryConfig": [],
+            "lines": [],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": ""
+      },
+      "expected": {
+        "notice": null
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "quiet",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "checkout",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "main",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "quiet",
+            "recordIds": [
+              "quiet"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a single-line query stays visible by default",
+      "input": {
+        "records": [
+          {
+            "id": "rev",
+            "root": "/workspace/repository",
+            "arguments": [
+              "rev-parse",
+              "HEAD"
+            ],
+            "temporaryConfig": [],
+            "lines": [
+              {
+                "stream": "stdout",
+                "text": "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              }
+            ],
+            "state": "completed",
+            "exitCode": 0,
+            "query": true
+          }
+        ],
+        "search": ""
+      },
+      "expected": {
+        "folds": []
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "rev",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "rev-parse",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "HEAD",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 1,
+                "kind": "text",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              }
+            ],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "rev",
+            "recordIds": [
+              "rev"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a single-line query folds when the display asks",
+      "input": {
+        "records": [
+          {
+            "id": "rev",
+            "root": "/workspace/repository",
+            "arguments": [
+              "rev-parse",
+              "HEAD"
+            ],
+            "temporaryConfig": [],
+            "lines": [
+              {
+                "stream": "stdout",
+                "text": "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+              }
+            ],
+            "state": "completed",
+            "exitCode": 0,
+            "query": true
+          }
+        ],
+        "search": "",
+        "display": {
+          "foldSingleLineQueries": true
+        }
+      },
+      "expected": {
+        "folds": [
+          [
+            0,
+            1,
+            "query"
+          ]
+        ]
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "rev",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "rev-parse",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-1",
+                "kind": "text",
+                "text": "HEAD",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [
+              {
+                "id": "output-0",
+                "start": 0,
+                "end": 1,
+                "kind": "query",
+                "count": 1,
+                "added": 0,
+                "updated": 0,
+                "deleted": 0,
+                "matches": 0
+              }
+            ],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "rev",
+            "recordIds": [
+              "rev"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "hidden temporary configuration keeps the operation's own configuration",
+      "input": {
+        "records": [
+          {
+            "id": "hooks",
+            "root": "/workspace/repository",
+            "arguments": [
+              "-c",
+              "core.hooksPath=/hooks",
+              "commit",
+              "-m",
+              "x"
+            ],
+            "temporaryConfig": [
+              [
+                "color.ui",
+                "false"
+              ],
+              [
+                "core.quotepath",
+                "false"
+              ]
+            ],
+            "lines": [],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": "",
+        "display": {
+          "hideTemporaryConfig": true
+        }
+      },
+      "expected": {
+        "commandFoldKinds": [
+          "configuration"
+        ],
+        "visibleCommandContains": [
+          "commit -m x"
+        ]
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "hooks",
+            "repositoryLabel": "/workspace/repository",
+            "command": [
+              {
+                "id": "configuration-0",
+                "kind": "configuration",
+                "text": "-c core.hooksPath=/hooks",
+                "preview": "-c …",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-2",
+                "kind": "text",
+                "text": "commit",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-3",
+                "kind": "text",
+                "text": "-m",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              },
+              {
+                "id": "argument-4",
+                "kind": "text",
+                "text": "x",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "hooks",
+            "recordIds": [
+              "hooks"
+            ],
+            "matches": 0
+          }
+        ],
+        "matches": [],
+        "totalMatches": 0
+      }
+    },
+    {
+      "name": "a hidden repository label is empty and out of search",
+      "input": {
+        "records": [
+          {
+            "id": "hidden",
+            "root": "/workspace/needle",
+            "arguments": [
+              "status"
+            ],
+            "temporaryConfig": [],
+            "lines": [],
+            "state": "completed",
+            "exitCode": 0
+          }
+        ],
+        "search": "needle",
+        "display": {
+          "hideRepository": true
+        }
+      },
+      "expected": {
+        "labels": [
+          ""
+        ],
+        "matches": 0
+      },
+      "presentation": {
+        "entries": [
+          {
+            "id": "hidden",
+            "repositoryLabel": "",
+            "command": [
+              {
+                "id": "argument-0",
+                "kind": "text",
+                "text": "status",
+                "preview": "",
+                "count": 1,
+                "matches": 0
+              }
+            ],
+            "output": [],
+            "failed": false,
+            "notice": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "hidden",
+            "recordIds": [
+              "hidden"
             ],
             "matches": 0
           }

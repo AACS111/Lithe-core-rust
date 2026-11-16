@@ -145,7 +145,7 @@ pub fn execute_git(
 }
 
 /// Runs one internal read-only Git query with optional locks disabled. It never
-/// prompts, and reaches the console only when the request sets `reportQueries`.
+/// prompts, and reaches the console only when the request records its query category.
 pub fn execute_git_readonly(
     root: &str,
     arguments: &[String],

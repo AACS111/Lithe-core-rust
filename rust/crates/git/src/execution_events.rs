@@ -44,8 +44,8 @@ enum Kind<'a> {
         /// Native presentation folds global options without rewriting actual argv.
         display_arguments: Vec<String>,
         global_arguments: Vec<String>,
-        /// An internal query reported through `reportQueries`, as opposed to a command the
-        /// workflow runs visibly; consoles fold a query's output by default.
+        /// An internal query reported because the console records its category, as opposed
+        /// to a command the workflow runs visibly; consoles fold a query's output by default.
         query: bool,
     },
     Output {
@@ -83,19 +83,16 @@ pub(super) struct Invocation {
     /// stays visible while stdout is replaced with one explicit redaction marker.
     redact_configuration: Cell<bool>,
     configuration_marker_sent: bool,
-    /// The child is an internal query reported only because the request asked for queries.
+    /// The child is an internal query reported only because the console records its category.
     query: bool,
 }
 impl Invocation {
     /// The invocation that reports a child: visible commands always report, and internal
-    /// queries only when the request set `reportQueries` and is not a background refresh.
+    /// queries only when the console records the request's query category.
     pub(super) fn reported(visible: bool) -> Option<Self> {
-        use super::{console::Source, execution_policy};
-        let query = || {
-            execution_policy::current().report_queries
-                && execution_policy::source() != Source::Background
-        };
-        let mut invocation = (visible || query()).then(Self::current).flatten()?;
+        let mut invocation = (visible || super::execution_policy::reports_queries())
+            .then(Self::current)
+            .flatten()?;
         invocation.query = !visible;
         Some(invocation)
     }
@@ -570,9 +567,10 @@ mod tests {
     #[test]
     fn reported_queries_are_marked_apart_from_visible_commands() {
         let options = crate::execution_policy::GitExecutionOptions {
-            report_queries: true,
+            console_queries: vec![crate::console::QueryCategory::Log],
             ..Default::default()
-        };
+        }
+        .for_command("git.history");
         let _policy = crate::execution_policy::Scope::begin(Some(options)).unwrap();
         let events = capture_request(|| {
             request_started(Some("marked"));

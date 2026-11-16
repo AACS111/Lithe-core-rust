@@ -1,12 +1,18 @@
 //! IDEA-style progress and query folding; ordinary command output remains continuous text.
-use super::types::{OutputFragment, Record};
+use super::types::{Display, OutputFragment, Record};
 use regex::Regex;
 use std::sync::OnceLock;
 
-pub(super) fn project(record: &Record) -> Vec<OutputFragment> {
+pub(super) fn project(record: &Record, display: &Display) -> Vec<OutputFragment> {
     // A query's output answers the workflow, not the user: like IDEA's silent handlers it
-    // stays out of sight, folded whole, unless the query failed or wrote a single line.
-    if record.query && record.lines.len() > 1 && !record.failed() {
+    // stays out of sight, folded whole, unless the query failed or wrote a single line that
+    // the console's display choices keep visible.
+    let folded_from = if display.fold_single_line_queries {
+        1
+    } else {
+        2
+    };
+    if record.query && record.lines.len() >= folded_from && !record.failed() {
         return vec![OutputFragment {
             id: "output-0".into(),
             start: 0,

@@ -718,7 +718,7 @@ or removing a command fails until the table changes in the same commit.
 | `git.changelists` | Reduce local ChangeList metadata and project membership and commit scope |
 | `git.shelf` | Capture or applies one guarded Shelf layer |
 | `git.commitMessageContext` | Capture bounded AI commit evidence and recheck its Git state |
-| `git.consolePresentation` | Pure IDEA-style configuration/progress folds, empty-output notices and search ranges over retained diagnostic snapshots |
+| `git.consolePresentation` | Pure IDEA-style configuration/progress/query folds, empty-output notices and search ranges over retained diagnostic snapshots, shaped by the console's display choices |
 | `git.remoteUrl` | Read a configured remote URL silently; a missing remote returns a null URL |
 | `git.fetchPlan` | Validate Fetch choices; optionally inspect a repository to expand enabled per-remote commands |
 | `git.executable` | Resolve the executable Git will run without requiring a repository |
@@ -1060,8 +1060,9 @@ is active; it does not wait behind a mutex outside its cancellation deadline.
 Git requests may include optional envelope metadata `gitExecution`:
 `{ executable?: string | null, interactive?: boolean, useCredentialHelper?: boolean,
 fetchDefaults?: GitFetchOptions, detailedFetch?: boolean, source?: "user" | "background" | "unknown",
-reportQueries?: boolean }`. Defaults are PATH, noninteractive, helper enabled, normal
-Fetch defaults, legacy Fetch results, and silent internal queries.
+consoleQueries?: QueryCategory[], queryCategory?: QueryCategory }`. Defaults are PATH,
+noninteractive, helper enabled, normal Fetch defaults, legacy Fetch results, and no
+recorded query category, which leaves every internal query silent as IDEA does.
 An executable must be an absolute native path to Git 2.31 or newer. Interactive
 commands require an event receiver. These values are request-scoped, including
 nested requests, and never implicitly persist. Both current applications opt
@@ -1196,7 +1197,7 @@ Native journals track `requestStarted` separately from visible command records.
 The native receiver retains the originating request directory so a failure before
 `started` can be shown as an unconfirmed request with no fabricated arguments or
 exit code. Successfully completed internal queries still produce no history row
-unless they were reported through `gitExecution.reportQueries`.
+unless their category is one the request's `gitExecution.consoleQueries` records.
 A request that ends with the `cancelled` error before any command started was
 superseded, not a Git failure, and also produces no row; a cancelled request that
 had started a command keeps that command with the cancellation as its reason.
@@ -1213,6 +1214,18 @@ Notices require empty retained output, no progress, no truncation and no failure
 zero `updatedReferenceCount` and `deletedReferenceCount`. Missing counts must not
 be treated as zero. Other successful empty results use `completedWithoutOutput`.
 
+`git.consolePresentation` accepts `{ records, search?: string, display?: { foldSingleLineQueries?:
+boolean, showCompletedWithoutOutput?: boolean, hideTemporaryConfig?: boolean,
+hideRepository?: boolean } }`. Every display choice defaults to `false`, which is IDEA's
+console: a query that wrote one line keeps it visible, `completedWithoutOutput` is omitted
+(IDEA prints nothing after an empty command; `waitingForOutput` and `fetchUnchanged` stay),
+temporary `-c` configuration is folded rather than left out, and each entry is labelled with
+its repository. `foldSingleLineQueries` folds a successful query's single line like longer
+output. `hideTemporaryConfig` leaves Core's temporary configuration out of the command
+fragments; `-c` pairs in the operation's own arguments still fold in place. `hideRepository`
+returns an empty `repositoryLabel` and excludes the repository from search. A host persists
+these as console preferences; they never change the retained records or copied commands.
+
 `displayArguments` and `globalArguments` are additive console projections: the
 former starts at the subcommand, and the latter contains temporary configuration
 as `-c key=value` pairs followed by the original global argument prefix. Consoles
@@ -1220,18 +1233,32 @@ fold contiguous `-c` pairs at their original positions; other global arguments
 stay visible. Raw `arguments` remain authoritative for copying and diagnostics. Older events without projections retain their legacy display.
 Visible workflow commands and explicit `git.command` requests produce execution
 events. Internal read-only queries remain silent in the console while retaining
-normal workflow capture and result semantics, unless the request sets
-`gitExecution.reportQueries`: then each query produces the same `started`, `output`
-and `finished` events as a visible command, so the console records what the
-workbench read. Their `started` event carries `query: true`; every visible command
+normal workflow capture and result semantics, unless `gitExecution.consoleQueries`
+records the request's query category: then each query produces the same `started`,
+`output` and `finished` events as a visible command, so the console records what the
+workbench read. A query category is `references` (background branch reads such as nested
+repository references), `reload` (reads after an operation completes), `diffRefresh`
+(reloading an open diff after a save), `diff`, `log`, `logPathFilter` (per-commit file
+reads that filter the log by path), `annotate`, `panels` (worktree, stash, remote and
+similar lists), or `checks` (pre-operation checks). The category is
+`gitExecution.queryCategory` when the host names one for reads the command alone does not
+tell apart; otherwise Core derives it from the request command: `diff` for `git.diff`,
+`git.comparison` and `git.planDiffBlocks`; `log` for history, reference, tag, commit and
+graph reads; `annotate` for `git.blame` and `git.lineHistory`; `panels` for worktree,
+stash, remote, pull request, untracked directory, repository setup and execution inspection
+reads; and `checks` for every other Git command. Commands outside Git have no category.
+A query whose category the console does not record emits no events, so it never consumes
+the console's capacity. See `rust/fixtures/git/console-queries-v1.json`.
+A reported query's `started` event carries `query: true`; every visible command
 carries `query: false`. A host passes the flag back as the console record's
 `query`, and `git.consolePresentation` then folds a query's whole output into one
 `query` output fragment whose `count` labels it, the way IDEA keeps silent
-handlers out of sight. A failed query and a query that wrote a single line keep
-their output visible. Search still counts and locates every folded line, so a
-host opens the fold on a hit. Queries of a request whose provenance is `background` (an
-automatic refresh or watcher, which runs too often to record) stay silent even
-then; provenance is `gitExecution.source`, or the envelope origin when that is
+handlers out of sight. A failed query keeps its output visible, and so does a query
+that wrote a single line unless `display.foldSingleLineQueries` is set. Search still
+counts and locates every folded line, so a host opens the fold on a hit. Queries of a
+request whose provenance is `background` (an automatic refresh or watcher, which runs too
+often to record) stay silent unless the host names their `queryCategory`;
+provenance is `gitExecution.source`, or the envelope origin when that is
 unknown. Reported queries never authenticate or prompt; a query that needs
 credentials fails as it does when silent. A query whose nonzero exit answers its
 question, such as a missing optional config value, an absent ref or a path outside

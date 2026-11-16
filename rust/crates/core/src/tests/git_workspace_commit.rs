@@ -74,9 +74,9 @@ fn reported_queries(root: &Path, command: &str, git_execution: Value) -> Vec<Val
     events
 }
 
-/// A console that records what the workbench reads asks for it per request; without it,
-/// and for an automatic refresh, the same query stays silent, and a reported query still
-/// finishes every record it starts.
+/// A console that records what the workbench reads names the categories it records per
+/// request; without them, for another category and for an automatic refresh, the same query
+/// stays silent, and a reported query still finishes every record it starts.
 #[test]
 fn git_internal_queries_report_events_only_when_the_request_asks() {
     let repo = repository("workspace-report-queries");
@@ -89,12 +89,17 @@ fn git_internal_queries_report_events_only_when_the_request_asks() {
             reported_queries(&repo.0, command, json!({})),
             Vec::<Value>::new()
         );
-        let refresh = json!({"reportQueries": true, "source": "background"});
+        let other = json!({"consoleQueries": ["log"], "source": "user"});
+        assert_eq!(
+            reported_queries(&repo.0, command, other),
+            Vec::<Value>::new()
+        );
+        let refresh = json!({"consoleQueries": ["checks"], "source": "background"});
         assert_eq!(
             reported_queries(&repo.0, command, refresh),
             Vec::<Value>::new()
         );
-        let user = json!({"reportQueries": true, "source": "user"});
+        let user = json!({"consoleQueries": ["checks"], "source": "user"});
         let events = reported_queries(&repo.0, command, user);
         let started: Vec<_> = events.iter().filter(|e| e["type"] == "started").collect();
         let finished: Vec<_> = events.iter().filter(|e| e["type"] == "finished").collect();
@@ -115,7 +120,7 @@ fn git_reported_status_shows_each_record_on_its_own_line() {
     fs::write(repo.0.join("first.txt"), "first").unwrap();
     fs::write(repo.0.join("second.txt"), "second").unwrap();
 
-    let events = reported_queries(&repo.0, "git.status", json!({"reportQueries": true}));
+    let events = reported_queries(&repo.0, "git.status", json!({"consoleQueries": ["checks"]}));
     let status = events
         .iter()
         .find(|e| {
