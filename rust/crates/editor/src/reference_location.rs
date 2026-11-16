@@ -90,7 +90,7 @@ fn extent(range: &Range) -> (u32, u32) {
 
 // Prefer a nested symbol chain over a flat entry, and a smaller enclosing range
 // when a server returns overlapping flat SymbolInformation entries.
-fn enclosing<'a>(symbols: &'a [Symbol], position: Position) -> Vec<&'a Symbol> {
+fn enclosing(symbols: &[Symbol], position: Position) -> Vec<&Symbol> {
     let mut best = Vec::new();
     let mut best_extent = (u32::MAX, u32::MAX);
     for symbol in symbols {
@@ -141,7 +141,7 @@ fn reference_symbol(symbols: &[Symbol], position: Position) -> Option<String> {
         };
         match symbol.kind {
             // LSP SymbolKind: Module, Namespace, Package
-            2 | 3 | 4 => namespaces.push(name.to_owned()),
+            2..=4 => namespaces.push(name.to_owned()),
             // Class, Enum, Interface, Struct
             5 | 10 | 11 | 23 => types.push(name.to_owned()),
             // Method, Constructor, Function
