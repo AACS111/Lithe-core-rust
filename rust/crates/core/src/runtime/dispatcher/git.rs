@@ -419,6 +419,14 @@ pub(super) fn dispatch(command: GitCommand, id: Option<String>, payload: Value) 
         GitCommand::RepositoryColorAssignments => {
             plugin_response(id, payload, lithe_git::repository_color_assignments_command)
         }
+        GitCommand::WorkspaceRepositorySelection => plugin_response(
+            id,
+            payload,
+            lithe_git::workspace_repository_selection_command,
+        ),
+        GitCommand::WorkspaceChangeGroups => {
+            plugin_response(id, payload, lithe_git::workspace_change_groups_command)
+        }
         GitCommand::UpdatePlan => plugin_response(id, payload, lithe_git::update_plan_command),
         GitCommand::HistoryWindow => {
             plugin_response(id, payload, lithe_git::history_window_command)

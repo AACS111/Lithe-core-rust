@@ -81,19 +81,77 @@ pub fn workspace_repositories(
         .into_iter()
         .collect::<Vec<PathBuf>>();
     sort_workspace_repository_paths(&mut repositories, &workspace_root);
-    if let Some(repository) = containing_repository {
-        repositories.retain(|path| path != &repository);
-        repositories.insert(0, repository);
+    if let Some(repository) = &containing_repository {
+        repositories.retain(|path| path != repository);
+        repositories.insert(0, repository.clone());
     }
 
     Ok(WorkspaceRepositoriesResponse {
         repositories: repositories
             .into_iter()
-            .map(|path| WorkspaceRepositoryResponse {
-                path: slash_separated_path(&path, Platform::HOST),
+            .filter_map(|path| {
+                workspace_repository_entry(&path, &workspace_root, containing_repository.as_ref())
             })
             .collect(),
     })
+}
+
+/// Projects one discovered root onto its portable identity, role and label.
+///
+/// The opened folder's own `.git` also makes it the workspace repository when
+/// `rev-parse` could not report it, so the role does not hinge on that one process.
+/// Both paths are canonical, so a repository is always the folder, below it, or an
+/// ancestor of it; anything else has no portable identity to key by and is dropped.
+fn workspace_repository_entry(
+    path: &Path,
+    workspace_root: &Path,
+    containing_repository: Option<&PathBuf>,
+) -> Option<WorkspaceRepositoryResponse> {
+    let role = if containing_repository.is_some_and(|repository| repository == path)
+        || path == workspace_root
+    {
+        WorkspaceRepositoryRole::Workspace
+    } else {
+        WorkspaceRepositoryRole::Nested
+    };
+    let id = workspace_repository_id(path, workspace_root)?;
+    let name = match role {
+        WorkspaceRepositoryRole::Workspace => path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| slash_separated_path(path, Platform::HOST)),
+        WorkspaceRepositoryRole::Nested => id.clone(),
+    };
+    Some(WorkspaceRepositoryResponse {
+        path: slash_separated_path(path, Platform::HOST),
+        id,
+        name,
+        role,
+    })
+}
+
+/// Identity of `repository` relative to the opened folder: `.` for the folder itself,
+/// its `/`-separated path below the folder, or one `..` per level for an enclosing
+/// repository. `None` when the two paths share no ancestry.
+///
+/// A remote workspace reports an enclosing repository in the host-path namespace,
+/// a sibling of the placeholder folder, so both paths are compared as host paths.
+fn workspace_repository_id(repository: &Path, workspace_root: &Path) -> Option<String> {
+    let repository = lithe_workspace::remote_path(repository);
+    let workspace_root = lithe_workspace::remote_path(workspace_root);
+    let (repository, workspace_root) = (repository.as_path(), workspace_root.as_path());
+    if repository == workspace_root {
+        return Some(".".to_string());
+    }
+    if let Ok(relative) = repository.strip_prefix(workspace_root) {
+        return Some(slash_separated_path(relative, Platform::HOST));
+    }
+    let levels = workspace_root
+        .strip_prefix(repository)
+        .ok()?
+        .components()
+        .count();
+    Some(vec![".."; levels].join("/"))
 }
 
 fn repository_scan_directory_is_visible(name: &str) -> bool {
@@ -423,9 +481,54 @@ pub(crate) fn relative_or_absolute(path: &Path, root: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_git_path_on;
+    use super::{validate_git_path_on, workspace_repository_entry};
     use lithe_platform::Platform;
-    use std::path::Path;
+    use serde_json::Value;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn discovered_roots_project_onto_the_shared_identities() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../fixtures/workspace/repositories-v1.json"
+        ))
+        .unwrap();
+        for case in fixture["cases"].as_array().unwrap() {
+            let root = PathBuf::from(case["payload"]["root"].as_str().unwrap());
+            let expected = &case["response"]["repositories"];
+            // The fixture's workspace entry stands for what `rev-parse` reported.
+            let containing = expected
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|entry| entry["role"] == "workspace")
+                .map(|entry| PathBuf::from(entry["path"].as_str().unwrap()));
+            let actual = expected
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| {
+                    let path = PathBuf::from(entry["path"].as_str().unwrap());
+                    workspace_repository_entry(&path, &root, containing.as_ref()).unwrap()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                &serde_json::to_value(actual).unwrap(),
+                expected,
+                "{}",
+                case["name"]
+            );
+        }
+    }
+
+    #[test]
+    fn a_root_without_shared_ancestry_has_no_identity() {
+        assert!(workspace_repository_entry(
+            Path::new("/elsewhere/repo"),
+            Path::new("/workspace"),
+            None
+        )
+        .is_none());
+    }
 
     #[test]
     fn windows_rejects_relative_names_it_would_store_differently() {

@@ -31,6 +31,7 @@ mod git_repository_setup;
 mod git_untracked_directories;
 mod git_update_plan;
 mod git_workspace_commit;
+mod git_workspace_repositories;
 mod git_workspace_status;
 mod git_worktree_creation_preview;
 mod github;

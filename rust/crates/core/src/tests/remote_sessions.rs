@@ -450,7 +450,17 @@ fn discovered_repository_keeps_host_identity(symlink: bool) {
         "workspace.repositories",
         json!({"root": placeholder}),
     );
-    assert_eq!(discovered["repositories"], json!([{"path": expected}]));
+    // The identity is relative to the folder the remote host opened, never to the
+    // local placeholder, so it survives the path mapping unchanged.
+    assert_eq!(
+        discovered["repositories"],
+        json!([{
+            "path": expected,
+            "id": if symlink { "." } else { ".." },
+            "name": "host",
+            "role": "workspace"
+        }])
+    );
     let root = discovered["repositories"][0]["path"].as_str().unwrap();
 
     // Simulate the bridge's next request using only the returned repository URL.

@@ -22,6 +22,7 @@ pub mod contracts;
 mod deleted_selection;
 mod diff_blocks;
 pub mod workspace_commit;
+mod workspace_repositories;
 pub mod workspace_status;
 pub use commit_state::{inspect as commit_state, GitCommitGitlink, GitCommitState};
 
@@ -124,6 +125,10 @@ pub use repository_colors::assign_command as repository_color_assignments_comman
 pub use rollback::{rollback_plan_command, rollback_prepare_command};
 pub use shelf::shelf_command;
 pub use update_plan::command as update_plan_command;
+pub use workspace_repositories::{
+    change_groups_command as workspace_change_groups_command,
+    selection_command as workspace_repository_selection_command,
+};
 pub use worktree_rules::creation_preview_command as worktree_creation_preview_command;
 
 /// Internals the `git.*` integration tests in `lithe-core` assert against.
@@ -168,6 +173,7 @@ use crate::contracts::{
     GitPushTagResponse, GitPushTargetKind, GitReferenceResponse, GitStashResponse,
     GitStashesResponse, GitStatusResponse, GitWatchContextResponse, GitWorktreeResponse,
     GitWorktreesResponse, WorkspaceRepositoriesResponse, WorkspaceRepositoryResponse,
+    WorkspaceRepositoryRole,
 };
 use lithe_protocol::{CoreError, ErrorCode};
 use lithe_workspace::fs;
