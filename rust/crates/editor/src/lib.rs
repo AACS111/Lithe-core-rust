@@ -11,6 +11,7 @@ pub mod navigation_history;
 pub mod navigation_input;
 pub mod preferences;
 pub mod recent;
+pub mod reference_location;
 pub mod recovery;
 pub mod text_edit_plan;
 
