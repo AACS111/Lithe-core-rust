@@ -132,6 +132,7 @@ pub(crate) fn apply_indexing_to_sessions(
             let order = session.lock_outbound_order()?;
             if session.lock_state()?.client.initialized {
                 if let Some(configuration) = session.plugin_configuration() {
+                    session.lock_state()?.hover_cache.clear();
                     session.send_messages_or_fail(
                         &order,
                         vec![plugin_configuration_notification(&configuration)],
@@ -171,7 +172,7 @@ impl RuntimeSession {
         let configuration = Arc::new(configuration);
         let outbound_order = self.lock_outbound_order()?;
         let initialized = {
-            let state = self.lock_state()?;
+            let mut state = self.lock_state()?;
             if matches!(
                 state.lifecycle,
                 LspLifecycleState::Stopping
@@ -183,6 +184,7 @@ impl RuntimeSession {
                     "The language session is no longer running.",
                 ));
             }
+            state.hover_cache.clear();
             // Under `outbound_order`, an uninitialized client sends the stored
             // configuration with its `initialized` notification instead.
             state.client.initialized

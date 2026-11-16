@@ -82,6 +82,9 @@ impl RuntimeSession {
             }
         }
         after_policy_check();
+        if server_message_clears_hovers(&value) {
+            self.lock_state()?.hover_cache.clear();
+        }
         if method == Some("workspace/configuration") {
             if let Some(response) = self.provider_configuration_response(&value)? {
                 return self.send_messages_or_fail(
@@ -323,6 +326,14 @@ impl RuntimeSession {
                             } else {
                                 result
                             };
+                            if let (Some(hover), Some(uri), None, Some(result)) = (
+                                pending.hover.as_ref(),
+                                pending.document_uri.as_deref(),
+                                error.as_ref(),
+                                result.as_ref(),
+                            ) {
+                                state.hover_cache.store(uri, hover, result);
+                            }
                             push_request_event(
                                 self,
                                 &mut state,

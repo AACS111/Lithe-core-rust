@@ -42,6 +42,8 @@ pub(crate) struct PendingRequest {
     pub(crate) document_uri: Option<String>,
     /// Document version observed when a presentation request was allocated.
     pub(crate) document_version: Option<i64>,
+    /// Set for a host hover whose answer may be kept in `SessionState::hover_cache`.
+    pub(crate) hover: Option<HoverRequest>,
     pub(crate) created_at: Instant,
     pub(crate) deadline: Instant,
 }
@@ -97,6 +99,9 @@ pub(crate) struct SessionState {
     /// Sender-side ingress budget uses the existing process clock, never a timer.
     pub(crate) plugin_diagnostics_window: Instant,
     pub(crate) plugin_diagnostics_count: u16,
+    /// Hover answers reused for a position the server already described; bounded
+    /// by `HOVER_CACHE_CAPACITY` and emptied whenever the server may know more.
+    pub(crate) hover_cache: HoverCache,
 }
 
 pub(crate) struct RuntimeSession {

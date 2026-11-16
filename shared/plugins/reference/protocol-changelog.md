@@ -133,6 +133,12 @@
 
 ## 时间线（新的在上）
 
+### 2026-11-16
+
+| PR | 修改人 | API 编号 | 协议 / 能力 | 改了什么 |
+| --- | --- | --- | --- | --- |
+| [#61](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/61) | [@xiaoyumuxi](https://github.com/xiaoyumuxi) | — | `languageServers` 0 内的补充 | LSP 引擎在一次会话里保留语言服务器的悬浮提示答案（[1lck/Lithe-IDEA#1995](https://github.com/1lck/Lithe-IDEA/issues/1995)）：同一文档版本的同一位置，或答案 `range` 在同一行内覆盖的位置，直接用保留的答案完成请求，不再发 `textDocument/hover`。每个会话最多 32 个，先丢最久没用的；空答案、错误、文本超过 64 KiB 的答案和清空之后才到达的答案照常交付但不保留。文档打开、修改、保存、关闭，工作区文件变化，设置或索引排除项变化，运行命令，后端的 `languageServer/request`、`languageServer/notify` 和宿主通知，服务器发来的任何请求和 `$/progress` 结束，以及会话停止时全部清空。`requestCompleted` 的结果形状不变，没有新增方法、字段或能力版本。 |
+
 ### 2026-11-15
 
 | PR | 修改人 | API 编号 | 协议 / 能力 | 改了什么 |

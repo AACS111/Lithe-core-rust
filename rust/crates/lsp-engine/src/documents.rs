@@ -7,7 +7,7 @@ impl RuntimeSession {
     pub(crate) fn save_document(&self, request: SaveDocumentRequest) -> Result<bool, CoreError> {
         let outbound_order = self.lock_outbound_order()?;
         let message = {
-            let state = self.lock_state()?;
+            let mut state = self.lock_state()?;
             ensure_not_terminal(state.lifecycle)?;
             if state.lifecycle != LspLifecycleState::Ready {
                 return Ok(false);
@@ -24,6 +24,7 @@ impl RuntimeSession {
             if *document.text != request.text {
                 return Ok(false);
             }
+            state.hover_cache.clear();
             let mut params = json!({"textDocument": {"uri": request.uri}});
             if include_text {
                 params["text"] = json!(request.text);
@@ -66,6 +67,7 @@ impl RuntimeSession {
         let message = {
             let mut state = self.lock_state()?;
             ensure_not_terminal(state.lifecycle)?;
+            state.hover_cache.clear();
             if !state.client.initialized {
                 state.pending_workspace_file_changes.extend(normalized);
                 return Ok(());
@@ -114,6 +116,7 @@ impl RuntimeSession {
                     });
                 }
             }
+            state.hover_cache.clear();
             if state.client.initialized {
                 let response = if state
                     .client
@@ -197,6 +200,7 @@ impl RuntimeSession {
                     "Cannot close a document that is not owned by the language-server session.",
                 ));
             };
+            state.hover_cache.clear();
             cleared = state.client.diagnostics.contains_key(uri);
             if document.version == 0 {
                 state.client.open_documents.remove(uri);

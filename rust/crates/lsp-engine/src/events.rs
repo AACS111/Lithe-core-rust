@@ -562,6 +562,7 @@ pub(crate) fn clear_runtime_state(session: &RuntimeSession, state: &mut SessionS
     state.maintenance_write_deadline = None;
     state.relay_write_deadline = None;
     state.pending_workspace_file_changes.clear();
+    state.hover_cache.clear();
     state.initialize_deadline = None;
     state.shutdown_deadline = None;
     push_features_event(session, state, Vec::new());
