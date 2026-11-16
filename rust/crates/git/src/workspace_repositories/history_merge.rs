@@ -26,7 +26,7 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
 /// Matches the commit bound of `git.graphProjection`, which lays out the merged list.
-const MAX_COMMITS: usize = 20_000;
+const MAX_COMMITS: usize = crate::history::MAX_LOG_COMMITS;
 /// SHA-256 object names are the longest Git writes.
 const MAX_HASH_BYTES: usize = 64;
 

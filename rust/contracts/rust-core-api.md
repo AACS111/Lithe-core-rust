@@ -1795,7 +1795,8 @@ Each visible row carries `commitHash`, integer `lane` and `laneCount`, a signed
 `printElements` (the up and down half-edges with `position`, `adjacentPosition`,
 `colorId`, `isDotted`, `isMissing`, `hasArrow`, `isTerminal`, `targetHash`). Hosts own
 pixels, curves, and the mapping from a color ID to a theme color; `colorId` `0` means
-an unreferenced fragment. Requests over 20,000 commits fail with `invalid_request`.
+an unreferenced fragment. Requests over 100,000 commits, the largest Git Log a
+`git.historyPage` stream reads, fail with `invalid_request`.
 `rust/fixtures/git/graph-projection-v1.json` defines the rules and
 `rust/fixtures/git/graph-idea/` holds the pinned IntelliJ oracles.
 
@@ -1959,7 +1960,7 @@ core clamps it to `1...5000`). It remains the compatibility command that
 combines `git.references` with the first `git.historyPage`. New clients use
 `git.references` with `{ "root": string }` and request commits separately with
 `git.historyPage` using `root`, optional full `reference`, nullable opaque
-`cursor`, `limit`, and optional `order` (`"topo"` or `"date"`). Omitted
+`cursor`, `limit`, optional `maxCommits`, and optional `order` (`"topo"` or `"date"`). Omitted
 `order` preserves the original `git log --topo-order` behavior. `"date"` uses
 `git log --date-order`: committer date descending whenever the child-before-
 parent constraint permits, independently of the displayed author date. macOS
@@ -1970,9 +1971,17 @@ continuations must repeat the same order. A mismatched order returns
 `rust/fixtures/git/history-page-date-request-v1.json`.
 The first request omits `cursor`; each later request
 returns the prior page's `nextCursor`. Core keeps one bounded, backpressured
-`git log` stream behind that cursor and clamps the stream to the first 5,000
-commits, so later pages continue traversal instead of replaying earlier commits.
-A history page returns `commits`, nullable `nextCursor`, and `hasMore`. Clients
+`git log` stream behind that cursor and clamps the stream to the first
+`maxCommits` commits, so later pages continue traversal instead of replaying earlier
+commits. `maxCommits` is 1 to 100,000 and defaults to 5,000; the first page fixes it
+for the cursor, a continuation omits it or repeats the same value, and a different
+value returns `invalid_request` without consuming the cursor. `maxCommits` with
+`offset`, or out of range, fails with `invalid_request`; the deprecated offset pages
+keep the 5,000 bound.
+A history page returns `commits`, nullable `nextCursor`, and `hasMore`. When the
+stream stops at `maxCommits` while the history goes on, the last page also returns
+`limitReached: true` with `hasMore: false`, so a client can tell a bounded log from
+a finished one and offer a larger bound; the field is omitted otherwise. Clients
 call `git.historyCursorClose` with `root` and `cursor` when abandoning an
 unfinished stream, and discard and close a late page when its repository,
 selected reference, or owning `operationId` is stale. Core also expires idle
@@ -2077,8 +2086,8 @@ and asks again; the earlier entries stay the same, so rows only grow at the end.
 `key` is the commit's hash, except that a hash more than one repository names,
 as a commit or as a parent, is keyed `<hash>@<id>` in each of them; `parentKeys`
 apply the same rule, so `git.graphProjection` laid out over the keys never joins
-two repositories. At most 10,000 repositories and 20,000 commits in total are
-accepted. An invalid or repeated `id`, a hash or parent that is not 1 to 64
+two repositories. At most 10,000 repositories and 100,000 commits in total,
+the bound of `git.graphProjection`, are accepted. An invalid or repeated `id`, a hash or parent that is not 1 to 64
 hexadecimal digits, a commit repeated within one repository, a missing
 `complete`, or an unknown field fails with `invalid_request`. See
 `rust/fixtures/git/workspace-history-merge-v1.json`.

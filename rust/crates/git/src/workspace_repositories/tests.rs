@@ -91,9 +91,10 @@ fn history_merge_rows_only_grow_at_the_end_as_pages_arrive() {
 
 #[test]
 fn history_merges_past_the_commit_bound_are_rejected() {
+    let half = crate::history::MAX_LOG_COMMITS / 2;
     let request = json!({"repositories": [
-        history("a", 10_001, 100_000_000, true),
-        history("bb", 10_000, 100_000_000, true),
+        history("a", half + 1, 100_000_000, true),
+        history("bb", half, 100_000_000, true),
     ]});
     assert!(history_merge_command(request).is_err());
 }
