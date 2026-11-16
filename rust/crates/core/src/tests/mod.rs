@@ -1,4 +1,5 @@
 mod build_configuration;
+mod build_model_tree;
 mod build_project_options;
 mod build_runtime_versions;
 mod build_systems;

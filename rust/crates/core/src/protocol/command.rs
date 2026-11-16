@@ -484,6 +484,8 @@ pub enum BuildCommand {
     DecodeDependencies,
     /// Digests the files a build model depends on (`build.syncFingerprint`).
     SyncFingerprint,
+    /// Nests a loaded model's projects and files their tasks for a tool window (`build.modelTree`).
+    ModelTree,
     /// Reduces a test run's termination and decoded summary to one verdict (`build.resolveTestRunOutcome`).
     ResolveTestRunOutcome,
     /// Merges a run's test results into the stored history inside the host-stated scope (`build.mergeTestOutcomes`).
@@ -1163,6 +1165,7 @@ impl CoreCommand {
             "build.decodeDiagnostics" => Some(Self::Build(BuildCommand::DecodeDiagnostics)),
             "build.decodeDependencies" => Some(Self::Build(BuildCommand::DecodeDependencies)),
             "build.syncFingerprint" => Some(Self::Build(BuildCommand::SyncFingerprint)),
+            "build.modelTree" => Some(Self::Build(BuildCommand::ModelTree)),
             "build.resolveTestRunOutcome" => Some(Self::Build(BuildCommand::ResolveTestRunOutcome)),
             "build.mergeTestOutcomes" => Some(Self::Build(BuildCommand::MergeTestOutcomes)),
             "vcs.detectRoots" => Some(Self::VcsDetectRoots),
