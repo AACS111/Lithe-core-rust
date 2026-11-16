@@ -42,7 +42,7 @@ struct Symbol {
     #[serde(default)]
     container_name: Option<String>,
     #[serde(default)]
-    children: Vec<Symbol>,
+    children: Option<Vec<Symbol>>,
 }
 
 /// Formats the server's innermost containing symbol, with a one-based source line.
@@ -98,7 +98,7 @@ fn enclosing(symbols: &[Symbol], position: Position) -> Vec<&Symbol> {
             continue;
         }
         let mut candidate = vec![symbol];
-        candidate.extend(enclosing(&symbol.children, position));
+        candidate.extend(enclosing(symbol.children.as_deref().unwrap_or(&[]), position));
         let span = extent(&symbol.range);
         if candidate.len() > best.len() || (candidate.len() == best.len() && span < best_extent) {
             best = candidate;
