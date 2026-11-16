@@ -98,7 +98,10 @@ fn enclosing(symbols: &[Symbol], position: Position) -> Vec<&Symbol> {
             continue;
         }
         let mut candidate = vec![symbol];
-        candidate.extend(enclosing(symbol.children.as_deref().unwrap_or(&[]), position));
+        candidate.extend(enclosing(
+            symbol.children.as_deref().unwrap_or(&[]),
+            position,
+        ));
         let span = extent(&symbol.range);
         if candidate.len() > best.len() || (candidate.len() == best.len() && span < best_extent) {
             best = candidate;
