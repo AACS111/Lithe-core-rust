@@ -76,6 +76,10 @@ fn selection_change_groups_and_history_merge_match_their_shared_fixtures() {
         "git.workspaceHistoryMerge",
         include_str!("../../../../fixtures/git/workspace-history-merge-v1.json"),
     );
+    check_fixture(
+        "git.workspaceCommonReferences",
+        include_str!("../../../../fixtures/git/workspace-common-references-v1.json"),
+    );
 }
 
 /// Discovery entries with the status each repository reports, as hosts send them.

@@ -128,6 +128,7 @@ pub use shelf::shelf_command;
 pub use update_plan::command as update_plan_command;
 pub use workspace_repositories::{
     change_groups_command as workspace_change_groups_command,
+    common_references_command as workspace_common_references_command,
     history_merge_command as workspace_history_merge_command,
     selection_command as workspace_repository_selection_command,
 };

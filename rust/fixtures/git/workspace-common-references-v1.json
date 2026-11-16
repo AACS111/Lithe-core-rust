@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "description": "git.workspaceCommonReferences lists the local and remote branches every repository of a workspace has, as IntelliJ IDEA lists its Common Local Branches and Common Remote Branches, in the first repository's order. current is the branch every repository has checked out, null when they differ or one is detached; a common local branch is current when it is that branch. A common local branch's upstream is the remote branch every repository tracks with it, null when one tracks nothing or they track different branches.",
+  "cases": [
+    {
+      "name": "branchesEveryRepositoryHasInTheFirstOrder",
+      "request": {
+        "repositories": [
+          {"id": "backend", "current": "dev", "local": [
+            {"name": "main", "upstream": "origin/main"},
+            {"name": "dev", "upstream": "origin/dev"},
+            {"name": "feature/login"}
+          ], "remote": ["origin/dev", "origin/main", "origin/feature/login"]},
+          {"id": "frontend", "current": "dev", "local": [
+            {"name": "dev", "upstream": "origin/dev"},
+            {"name": "main", "upstream": "origin/main"}
+          ], "remote": ["origin/main", "origin/dev"]}
+        ]
+      },
+      "response": {
+        "current": "dev",
+        "local": [
+          {"name": "main", "upstream": "origin/main", "current": false},
+          {"name": "dev", "upstream": "origin/dev", "current": true}
+        ],
+        "remote": ["origin/dev", "origin/main"]
+      }
+    },
+    {
+      "name": "differentCheckoutsHaveNoCommonCurrentBranch",
+      "request": {
+        "repositories": [
+          {"id": "backend", "current": "main", "local": [{"name": "main"}, {"name": "dev"}]},
+          {"id": "frontend", "current": "dev", "local": [{"name": "main"}, {"name": "dev"}]},
+          {"id": "shared", "local": [{"name": "dev"}, {"name": "main"}]}
+        ]
+      },
+      "response": {
+        "current": null,
+        "local": [
+          {"name": "main", "upstream": null, "current": false},
+          {"name": "dev", "upstream": null, "current": false}
+        ],
+        "remote": []
+      }
+    },
+    {
+      "name": "anUpstreamOneRepositoryLacksOrTracksElsewhereIsNotCommon",
+      "request": {
+        "repositories": [
+          {"id": "backend", "local": [{"name": "main", "upstream": "origin/main"}, {"name": "dev", "upstream": "origin/dev"}]},
+          {"id": "frontend", "local": [{"name": "main"}, {"name": "dev", "upstream": "upstream/dev"}]},
+          {"id": "shared", "local": [{"name": "main", "upstream": "origin/main"}, {"name": "dev", "upstream": "origin/dev"}]}
+        ]
+      },
+      "response": {
+        "current": null,
+        "local": [
+          {"name": "main", "upstream": null, "current": false},
+          {"name": "dev", "upstream": null, "current": false}
+        ],
+        "remote": []
+      }
+    },
+    {
+      "name": "oneRepositoryListsItsOwnBranches",
+      "request": {
+        "repositories": [
+          {"id": ".", "current": "main", "local": [{"name": "main", "upstream": "origin/main"}], "remote": ["origin/main"]}
+        ]
+      },
+      "response": {
+        "current": "main",
+        "local": [{"name": "main", "upstream": "origin/main", "current": true}],
+        "remote": ["origin/main"]
+      }
+    },
+    {
+      "name": "noRepositoryHasNoCommonBranch",
+      "request": {"repositories": []},
+      "response": {"current": null, "local": [], "remote": []}
+    }
+  ],
+  "invalid": [
+    {"name": "repeatedId", "request": {"repositories": [{"id": "a"}, {"id": "a"}]}},
+    {"name": "absoluteId", "request": {"repositories": [{"id": "/a"}]}},
+    {"name": "emptyBranchName", "request": {"repositories": [{"id": "a", "local": [{"name": ""}]}]}},
+    {"name": "repeatedLocalBranch", "request": {"repositories": [{"id": "a", "local": [{"name": "main"}, {"name": "main"}]}]}},
+    {"name": "repeatedRemoteBranch", "request": {"repositories": [{"id": "a", "remote": ["origin/main", "origin/main"]}]}},
+    {"name": "emptyCurrentBranch", "request": {"repositories": [{"id": "a", "current": ""}]}},
+    {"name": "unknownField", "request": {"repositories": [{"id": "a", "tags": []}]}}
+  ]
+}

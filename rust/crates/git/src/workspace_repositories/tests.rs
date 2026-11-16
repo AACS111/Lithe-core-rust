@@ -1,6 +1,9 @@
 //! Workspace repository projections against their shared fixtures.
 
-use super::{change_groups_command, history_merge_command, selection_command, MAX_REPOSITORIES};
+use super::{
+    change_groups_command, common_references_command, history_merge_command, selection_command,
+    MAX_REPOSITORIES,
+};
 use lithe_protocol::CoreError;
 use serde_json::{json, Value};
 
@@ -28,6 +31,14 @@ fn selection_matches_the_shared_fixture() {
     check_fixture(
         include_str!("../../../../fixtures/git/workspace-repository-selection-v1.json"),
         selection_command,
+    );
+}
+
+#[test]
+fn common_references_match_the_shared_fixture() {
+    check_fixture(
+        include_str!("../../../../fixtures/git/workspace-common-references-v1.json"),
+        common_references_command,
     );
 }
 

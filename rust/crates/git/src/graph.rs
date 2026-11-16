@@ -56,6 +56,12 @@ struct Request {
     /// When present, the response lists the commits reachable from this local branch.
     #[serde(default)]
     current_branch: Option<String>,
+    /// When true, the response lists the commits reachable from every commit Git decorates as a
+    /// checked-out branch (`HEAD -> name`), in place of `current_branch`: the current branch of
+    /// each repository of a log that lists several, as IntelliJ's highlighter reads the current
+    /// branch of each commit's own root. A detached `HEAD` starts no walk.
+    #[serde(default)]
+    checked_out_heads: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -903,7 +909,14 @@ fn project(request: &Request, options: DisplayOptions) -> GraphProjection {
         permanent_context,
         options,
     );
-    if let Some(branch) = &request.current_branch {
+    if request.checked_out_heads {
+        projection.current_branch_hashes = ancestry(request, |commit| {
+            commit
+                .decorations
+                .split(',')
+                .any(|value| value.trim().starts_with("HEAD -> "))
+        });
+    } else if let Some(branch) = &request.current_branch {
         projection.current_branch_hashes = current_branch_hashes(request, branch);
     }
     projection
@@ -1191,24 +1204,36 @@ fn build_rows(
 /// IntelliJ's `CurrentBranchHighlighter` colors ancestry, including every merge
 /// parent. Only the loaded graph can prove membership; a missing parent ends the walk.
 fn current_branch_hashes(request: &Request, branch: &str) -> Vec<String> {
+    let no_remotes = HashSet::new();
+    let mut found = false;
+    ancestry(request, |commit| {
+        // Only the first commit carrying the branch starts the walk.
+        if found {
+            return false;
+        }
+        found = parse_labels(&commit.decorations, &no_remotes)
+            .iter()
+            .any(|l| l.kind == GraphLabelKind::Branch && l.title == branch);
+        found
+    })
+}
+
+/// The commits reachable from every loaded commit `is_head` picks, scoped ones first, sorted.
+fn ancestry(request: &Request, mut is_head: impl FnMut(&CommitInput) -> bool) -> Vec<String> {
     let all = request
         .commits
         .iter()
         .chain(request.repository_commits.iter())
         .collect::<Vec<_>>();
-    let no_remotes = HashSet::new();
-    let Some(head) = all.iter().find(|commit| {
-        parse_labels(&commit.decorations, &no_remotes)
-            .iter()
-            .any(|l| l.kind == GraphLabelKind::Branch && l.title == branch)
-    }) else {
-        return Vec::new();
-    };
     let mut by_hash: HashMap<&str, &CommitInput> = HashMap::with_capacity(all.len());
     for commit in &all {
         by_hash.entry(commit.hash.as_str()).or_insert(commit);
     }
-    let mut pending = vec![head.hash.as_str()];
+    let mut pending = all
+        .iter()
+        .filter(|commit| is_head(commit))
+        .map(|commit| commit.hash.as_str())
+        .collect::<Vec<_>>();
     let mut reached = HashSet::new();
     while let Some(hash) = pending.pop() {
         if !reached.insert(hash) {
