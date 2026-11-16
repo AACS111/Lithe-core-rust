@@ -3,6 +3,12 @@
 //! Automatic discovery is best effort below the required workspace root. Declared
 //! build-system modules remain owned by their provider and bypass these defaults.
 //!
+//! Every scan, fingerprints included, skips the directories the default
+//! visibility rules hide: Core's own folders (`.git`, the worktree containers and
+//! the root `.lithe`) and the folder names the enabled plugins declare, such as
+//! `target` while a Cargo plugin is enabled. The rules are read once per scan, so
+//! a plugin enabled during a scan applies from the next one.
+//!
 //! Heuristic discovery also skips the directories Git ignores: agent worktrees,
 //! generated trees and local checkouts repeat or imitate the project's own
 //! manifests, and listing them as run or build roots shows every module twice.
@@ -20,6 +26,7 @@
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore::Match;
+use lithe_core_rules::visibility::VisibilityRules;
 use lithe_platform::paths::slash_separated_path;
 use lithe_platform::Platform;
 use lithe_protocol::CoreError;
@@ -36,51 +43,6 @@ const MAX_HEURISTIC_DIRECTORIES: usize = 4000;
 /// Largest ignore file, gitfile or `commondir` file the scan reads. A larger one
 /// contributes no rules, which only lets the scan see more directories.
 const MAX_IGNORE_SOURCE_BYTES: u64 = 1 << 20;
-
-const EXCLUDED_DIRECTORIES: &[&str] = &[
-    ".git",
-    ".worktree",
-    ".worktrees",
-    ".lithe",
-    ".idea",
-    ".vscode",
-    ".gradle",
-    ".venv",
-    "venv",
-    ".tox",
-    ".mypy_cache",
-    ".pytest_cache",
-    "__pycache__",
-    ".next",
-    ".nuxt",
-    ".svelte-kit",
-    ".terraform",
-    ".cargo",
-    ".stack-work",
-    ".bundle",
-    ".dart_tool",
-    ".build",
-    ".swiftpm",
-    "node_modules",
-    "bower_components",
-    "vendor",
-    "target",
-    "build",
-    "dist",
-    "out",
-    "obj",
-    "coverage",
-    "DerivedData",
-    "Pods",
-];
-
-/// Default pruning for automatic run discovery, fingerprints and host file lists.
-/// Hidden source directories are allowed unless explicitly named here.
-pub fn is_run_scan_excluded_directory(name: &str) -> bool {
-    EXCLUDED_DIRECTORIES
-        .iter()
-        .any(|excluded| excluded.eq_ignore_ascii_case(name))
-}
 
 /// One directory's files, without following directory symlinks.
 pub struct ScannedDirectory {
@@ -373,6 +335,7 @@ fn visit_with_readers(
     mut visit: impl FnMut(ScannedDirectory) -> ControlFlow<()>,
 ) -> Result<BTreeSet<String>, CoreError> {
     let heuristic = max_depth.is_some();
+    let hidden = VisibilityRules::new(Vec::new(), Vec::new());
     let mut unreadable_paths = BTreeSet::new();
     let mut directory_count = 0;
     let mut pending: Vec<(PathBuf, usize, Option<Rc<IgnoreRules>>)> =
@@ -415,8 +378,8 @@ fn visit_with_readers(
                 repository = Some(directory);
             }
             if directory {
-                if !is_run_scan_excluded_directory(name)
-                    && max_depth.is_none_or(|limit| depth < limit)
+                if max_depth.is_none_or(|limit| depth < limit)
+                    && !hidden.is_hidden(&relative(root, &child), true)
                 {
                     subdirectories.push(child);
                 }
@@ -506,7 +469,7 @@ mod tests {
                 Ok(vec![
                     (root.join("blocked"), true, false),
                     (root.join(".sources"), true, false),
-                    (root.join(".pytest_cache"), true, false),
+                    (root.join(".git"), true, false),
                 ])
             } else if path.ends_with(".sources") {
                 Ok(vec![(path.join("main.txt"), false, false)])

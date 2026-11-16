@@ -477,6 +477,27 @@
       "expectedCode": "plugin.path.invalid"
     },
     {
+      "name": "hidden directory name with a path separator",
+      "base": "build-static-file.plugin.json",
+      "edits": [{ "op": "set", "path": "/buildSystems/0/layout/hiddenDirectoryNames", "value": ["target", "out/classes"] }],
+      "expectedCode": "plugin.path.invalid",
+      "expectedField": "buildSystems[0].layout.hiddenDirectoryNames[1]"
+    },
+    {
+      "name": "hidden directory name with a glob character",
+      "base": "build-static-file.plugin.json",
+      "edits": [{ "op": "set", "path": "/buildSystems/0/layout/hiddenDirectoryNames", "value": ["*.egg-info"] }],
+      "expectedCode": "plugin.path.invalid",
+      "expectedField": "buildSystems[0].layout.hiddenDirectoryNames[0]"
+    },
+    {
+      "name": "hidden directory name that turns a default off",
+      "base": "build-static-file.plugin.json",
+      "edits": [{ "op": "set", "path": "/buildSystems/0/layout/hiddenDirectoryNames", "value": ["!target"] }],
+      "expectedCode": "plugin.path.invalid",
+      "expectedField": "buildSystems[0].layout.hiddenDirectoryNames[0]"
+    },
+    {
       "name": "selector without a pointer",
       "base": "build-static-file.plugin.json",
       "edits": [{ "op": "set", "path": "/buildSystems/0/model/map/projects/0/name", "value": "name" }],

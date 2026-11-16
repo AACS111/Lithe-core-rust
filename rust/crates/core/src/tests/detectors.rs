@@ -6,10 +6,10 @@ use std::path::Path;
 
 /// Builds a project that mixes six ecosystems in one tree, including the
 /// traps that break naive detectors: a lockfile that is not npm's, a
-/// `node_modules` full of decoy manifests, and a Go command in a
+/// nested worktree full of decoy manifests, and a Go command in a
 /// subdirectory with no manifest of its own.
 fn multi_language_project(root: &Path) {
-    for directory in ["frontend/node_modules/decoy", "api", "cmd/gateway"] {
+    for directory in ["frontend/.worktrees/decoy", "api", "cmd/gateway"] {
         fs::create_dir_all(root.join(directory)).unwrap();
     }
     fs::write(
@@ -19,7 +19,7 @@ fn multi_language_project(root: &Path) {
     .unwrap();
     fs::write(root.join("frontend/pnpm-lock.yaml"), "lockfileVersion: 9\n").unwrap();
     fs::write(
-        root.join("frontend/node_modules/decoy/package.json"),
+        root.join("frontend/.worktrees/decoy/package.json"),
         r#"{"scripts":{"dev":"should-never-appear"}}"#,
     )
     .unwrap();
@@ -105,10 +105,10 @@ fn detectors_find_services_across_unrelated_ecosystems() {
     fs::remove_dir_all(root).unwrap();
 }
 
-/// A dependency tree contains thousands of manifests. Descending into it
+/// A worktree container repeats every manifest of the project. Descending into it
 /// would both bury the real services and make project open unusably slow.
 #[test]
-fn detectors_never_descend_into_dependency_directories() {
+fn detectors_never_descend_into_hidden_folders() {
     let root = temporary_root("detect-prune");
     fs::create_dir_all(&root).unwrap();
     multi_language_project(&root);
@@ -131,7 +131,7 @@ fn detectors_never_descend_into_dependency_directories() {
         .collect::<Vec<_>>();
 
     assert!(
-        !sources.iter().any(|source| source.contains("node_modules")),
+        !sources.iter().any(|source| source.contains(".worktrees/decoy")),
         "{sources:?}"
     );
     assert!(

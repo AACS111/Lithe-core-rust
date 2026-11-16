@@ -78,7 +78,7 @@ impl DirectoryContext {
 }
 
 /// Walks the project, pruning uninteresting subtrees *before* descending rather
-/// than filtering afterwards, so a `node_modules` tree is never read at all.
+/// than filtering afterwards, so a hidden tree is never read at all.
 pub fn scan(root: &Path) -> Result<Vec<DirectoryContext>, CoreError> {
     scan_ignoring(root, &IgnoredPaths::default())
 }

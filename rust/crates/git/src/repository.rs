@@ -162,10 +162,7 @@ fn repository_scan_directory_is_visible(name: &str) -> bool {
     }
     // Filter descendants, never the explicitly opened root or its containing
     // repository. Git ignore rules govern tracked files, not repository ownership.
-    !name.starts_with('.')
-        && !lithe_core_rules::visibility::BUILT_IN_HIDDEN_DIRECTORIES
-            .iter()
-            .any(|hidden| name.eq_ignore_ascii_case(hidden))
+    !name.starts_with('.') && !lithe_core_rules::visibility::is_default_hidden_directory_name(name)
 }
 
 /// Rejects Windows names that cannot round-trip through ordinary path identifiers.

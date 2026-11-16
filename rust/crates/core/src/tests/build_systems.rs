@@ -698,7 +698,7 @@ fn detection_applies_nesting_priority_and_rejections() {
             "android/app/build.gradle.kts",
             "plugins { id(\"application\") }\n",
         )
-        .write("target/debug/Cargo.toml", "[package]\nname = \"ignored\"\n");
+        .write(".worktrees/feature/Cargo.toml", "[package]\nname = \"ignored\"\n");
 
     let mut preferred = fixture("build-static-file.plugin.json");
     preferred["id"] = json!("dev.lithe.fixture.cargo-preferred");
