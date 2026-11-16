@@ -202,7 +202,7 @@ fn expected_nonzero_queries_are_distinct_from_real_failures_and_limits_are_expli
 }
 
 #[test]
-fn query_output_folds_whole_unless_the_query_failed_or_wrote_one_line() {
+fn query_output_folds_whole_once_longer_than_ten_lines_unless_the_query_failed() {
     let make = |count: usize, query: bool, state: &str, exit: Option<i32>| -> Request {
         serde_json::from_value(json!({"search":"line 7", "records":[{
             "id":"log", "root":"/repo", "arguments":["log","--max-count=50"], "state":state,
@@ -230,8 +230,52 @@ fn query_output_folds_whole_unless_the_query_failed_or_wrote_one_line() {
     let failed = present(make(40, true, "completed", Some(128))).unwrap();
     assert!(failed.entries[0].failed);
     assert!(failed.entries[0].output.iter().all(|f| f.kind == "text"));
-    let single = present(make(1, true, "completed", Some(0))).unwrap();
-    assert_eq!(single.entries[0].output[0].kind, "text");
+    // Ten lines are read at a glance; the eleventh makes the output worth a fold.
+    let short = present(make(10, true, "completed", Some(0))).unwrap();
+    assert_eq!(short.entries[0].output.len(), 10);
+    assert!(short.entries[0].output.iter().all(|f| f.kind == "text"));
+    let long = present(make(11, true, "completed", Some(0))).unwrap();
+    assert_eq!(long.entries[0].output[0].kind, "query");
+    let mut asked = make(1, true, "completed", Some(0));
+    asked.display.fold_short_queries = true;
+    assert_eq!(present(asked).unwrap().entries[0].output[0].kind, "query");
     let visible = present(make(40, false, "completed", Some(0))).unwrap();
     assert!(visible.entries[0].output.iter().all(|f| f.kind == "text"));
+}
+
+#[test]
+fn deletions_keep_their_configuration_progress_and_queries_open() {
+    let make = |arguments: Value, lines: Vec<String>, query: bool| -> Request {
+        serde_json::from_value(json!({"display":{"foldShortQueries":true}, "records":[{
+            "id":"delete", "root":"/repo", "arguments":arguments, "state":"completed",
+            "exitCode":0, "query":query, "temporaryConfig":[["credential.helper",""]],
+            "lines":lines.iter().map(|text| json!({"stream":"stderr","text":text})).collect::<Vec<_>>()
+        }]}))
+        .unwrap()
+    };
+    let progress = (0..20)
+        .map(|i| format!("Receiving objects: {}% ({i}/20)", i * 5))
+        .collect::<Vec<_>>();
+    let fetch = present(make(json!(["fetch", "origin"]), progress.clone(), false)).unwrap();
+    assert_eq!(fetch.entries[0].output[0].kind, "progress");
+    assert_eq!(fetch.entries[0].command[0].kind, "configuration");
+    let prune = present(make(json!(["fetch", "origin", "--prune"]), progress, false)).unwrap();
+    assert!(prune.entries[0].output.iter().all(|f| f.kind == "text"));
+    assert!(prune.entries[0].command.iter().all(|f| f.kind == "text"));
+    let listed = (0..20)
+        .map(|i| format!("Would remove build/{i}.o"))
+        .collect::<Vec<_>>();
+    let clean = present(make(json!(["clean", "-n", "-d"]), listed, true)).unwrap();
+    assert_eq!(clean.entries[0].output.len(), 20);
+    assert!(clean.entries[0].output.iter().all(|f| f.kind == "text"));
+    let text = clean.entries[0]
+        .command
+        .iter()
+        .map(|f| f.text.clone())
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        text.starts_with("-c credential.helper= clean -n -d"),
+        "{text}"
+    );
 }

@@ -1,6 +1,7 @@
 //! Shared IDEA-style Git console folding and search over retained command text.
 pub mod category;
 mod command;
+mod deletion;
 mod output;
 #[cfg(test)]
 mod tests;
@@ -58,6 +59,7 @@ pub fn present(request: Request) -> Result<Presentation, CoreError> {
     let display = &request.display;
     for record in &request.records {
         let previous_matches = presentation.total_matches;
+        let deletes = deletion::deletes(&record.arguments);
         let mut entry = Entry {
             id: record.id.clone(),
             repository_label: if display.hide_repository {
@@ -65,8 +67,8 @@ pub fn present(request: Request) -> Result<Presentation, CoreError> {
             } else {
                 record.root.clone()
             },
-            command: command::project(record, display),
-            output: output::project(record, display),
+            command: command::project(record, display, deletes),
+            output: output::project(record, display, deletes),
             failed: record.failed(),
             notice: record.notice().filter(|notice| {
                 display.show_completed_without_output || *notice != Notice::CompletedWithoutOutput

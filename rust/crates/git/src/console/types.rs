@@ -41,9 +41,9 @@ pub enum QueryCategory {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct Display {
-    /// Fold a successful query's output even when it is a single line, so a query shows its
-    /// command alone.
-    pub fold_single_line_queries: bool,
+    /// Fold a successful query's output at any length, so a query shows its command alone.
+    /// Unset, output of at most ten lines stays visible. A deletion is never folded.
+    pub fold_short_queries: bool,
     /// Show the `completedWithoutOutput` notice; IDEA prints nothing when a command finishes.
     pub show_completed_without_output: bool,
     /// Omit Lithe's temporary configuration instead of folding it. `-c` arguments the

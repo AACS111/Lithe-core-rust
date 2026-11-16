@@ -23,7 +23,8 @@ fn join(values: &[String]) -> String {
 /// Fold contiguous Git configuration arguments in place, as IDEA's console does.
 /// Token boundaries preserve quoted values and avoid folding behavior flags or paths.
 /// Hidden temporary configuration is left out; the arguments themselves always stay.
-pub(super) fn project(record: &Record, display: &Display) -> Vec<CommandFragment> {
+/// A command that `deletes` keeps its configuration open, so nothing of it hides.
+pub(super) fn project(record: &Record, display: &Display, deletes: bool) -> Vec<CommandFragment> {
     let mut args = Vec::new();
     if !display.hide_temporary_config {
         for (key, value) in &record.temporary_config {
@@ -31,7 +32,11 @@ pub(super) fn project(record: &Record, display: &Display) -> Vec<CommandFragment
         }
     }
     args.extend_from_slice(&record.arguments);
-    let command = command_index(&args).unwrap_or(0);
+    let command = if deletes {
+        0
+    } else {
+        command_index(&args).unwrap_or(0)
+    };
     let mut result = Vec::new();
     let mut index = 0;
     while index < args.len() {

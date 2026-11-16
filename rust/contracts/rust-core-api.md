@@ -1214,17 +1214,32 @@ Notices require empty retained output, no progress, no truncation and no failure
 zero `updatedReferenceCount` and `deletedReferenceCount`. Missing counts must not
 be treated as zero. Other successful empty results use `completedWithoutOutput`.
 
-`git.consolePresentation` accepts `{ records, search?: string, display?: { foldSingleLineQueries?:
+`git.consolePresentation` accepts `{ records, search?: string, display?: { foldShortQueries?:
 boolean, showCompletedWithoutOutput?: boolean, hideTemporaryConfig?: boolean,
 hideRepository?: boolean } }`. Every display choice defaults to `false`, which is IDEA's
-console: a query that wrote one line keeps it visible, `completedWithoutOutput` is omitted
-(IDEA prints nothing after an empty command; `waitingForOutput` and `fetchUnchanged` stay),
-temporary `-c` configuration is folded rather than left out, and each entry is labelled with
-its repository. `foldSingleLineQueries` folds a successful query's single line like longer
-output. `hideTemporaryConfig` leaves Core's temporary configuration out of the command
+console: a query that wrote ten lines or fewer keeps them visible, `completedWithoutOutput`
+is omitted (IDEA prints nothing after an empty command; `waitingForOutput` and
+`fetchUnchanged` stay), temporary `-c` configuration is folded rather than left out, and each
+entry is labelled with its repository. `foldShortQueries` folds a successful query's output
+at any length. `hideTemporaryConfig` leaves Core's temporary configuration out of the command
 fragments; `-c` pairs in the operation's own arguments still fold in place. `hideRepository`
 returns an empty `repositoryLabel` and excludes the repository from search. A host persists
 these as console preferences; they never change the retained records or copied commands.
+
+Output folds only when it is longer than ten lines: a contiguous block of Git progress lines
+(IDEA's progress grammar, remote phases included) becomes one `progress` fragment once it has
+more than ten lines, and shorter blocks stay `text`. A failed record folds no output. A record
+whose arguments delete something folds nothing at all, neither its `-c` configuration nor its
+progress nor a query's output, whatever the display choices, so the console shows everything
+a deletion ran with and reported; `hideTemporaryConfig` still leaves the temporary
+configuration out. Deleting means, after the global options: `rm` and `clean` (a dry-run
+`clean -n` lists what a clean deletes); `branch`, `tag`, `update-ref` or `symbolic-ref` with
+`-d`, `-D` or `--delete`; `push` with `-d`, `--delete`, `--prune` or a refspec without a
+source (`:refs/heads/topic`); `fetch` or `pull` with `-p`, `--prune`, `-P` or `--prune-tags`;
+`remote remove`, `remote rm`, `remote prune` and `remote update --prune`; `config` with
+`--unset`, `--unset-all`, `--remove-section`, `unset` or `remove-section`; `stash drop`,
+`stash clear` and `stash pop`; and `worktree remove` and `worktree prune`. Only options
+before `--` count. See the `deletions` table of `rust/fixtures/git/console-presentation-v1.json`.
 
 `displayArguments` and `globalArguments` are additive console projections: the
 former starts at the subcommand, and the latter contains temporary configuration
@@ -1247,14 +1262,21 @@ tell apart; otherwise Core derives it from the request command: `diff` for `git.
 graph reads; `annotate` for `git.blame` and `git.lineHistory`; `panels` for worktree,
 stash, remote, pull request, untracked directory, repository setup and execution inspection
 reads; and `checks` for every other Git command. Commands outside Git have no category.
-A query whose category the console does not record emits no events, so it never consumes
-the console's capacity. See `rust/fixtures/git/console-queries-v1.json`.
+A query whose category the console does not record emits no events while it succeeds, so it
+never consumes the console's capacity. If it fails (an error, or a nonzero exit that does not
+answer its question) in a request whose provenance is not `background`, Core sends its
+`started` event (`query: true`), its stderr lines and its `finished` event together once it
+ends, so the console shows the command, diagnostics and exit that failed; its stdout is not
+kept, and the request then needs no `failureRecord`. A cancelled query reports nothing, and a
+background request's unrecorded queries stay silent even when they fail. See
+`rust/fixtures/git/console-queries-v1.json`.
 A reported query's `started` event carries `query: true`; every visible command
 carries `query: false`. A host passes the flag back as the console record's
 `query`, and `git.consolePresentation` then folds a query's whole output into one
 `query` output fragment whose `count` labels it, the way IDEA keeps silent
 handlers out of sight. A failed query keeps its output visible, and so does a query
-that wrote a single line unless `display.foldSingleLineQueries` is set. Search still
+that wrote ten lines or fewer unless `display.foldShortQueries` is set, or a query that
+deletes, such as `clean -n`. Search still
 counts and locates every folded line, so a host opens the fold on a hit. Queries of a
 request whose provenance is `background` (an automatic refresh or watcher, which runs too
 often to record) stay silent unless the host names their `queryCategory`;

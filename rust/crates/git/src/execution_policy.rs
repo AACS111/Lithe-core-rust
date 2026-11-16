@@ -115,6 +115,13 @@ pub(super) fn reports_queries() -> bool {
         .is_some_and(|category| options.console_queries.contains(&category))
 }
 
+/// Whether the running request's unrecorded queries still report a failure: a request that
+/// is not `background`, as every such query did before the console chose categories.
+/// Background refreshes and watchers stay silent even when a read fails.
+pub(super) fn reports_query_failures() -> bool {
+    source() != super::console::Source::Background
+}
+
 /// Environment configuration and scope provenance require Git 2.31 or newer.
 pub(super) fn validate_version(version: &str) -> Result<(), CoreError> {
     let supported = version
