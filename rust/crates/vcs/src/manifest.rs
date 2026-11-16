@@ -120,7 +120,7 @@ fn is_marker_name(value: &str) -> bool {
 pub struct DeclarationContext<'a> {
     /// The manifest's validated settings, which launch templates may reference.
     pub declared_settings: &'a DeclaredSettings,
-    /// Whether tool names are host runtimes or tool-definition IDs.
+    /// The tool-definition IDs in `requiresTools` that a process may name.
     pub runtime_tools: lithe_plugin_model::process::RuntimeTools<'a>,
 }
 
