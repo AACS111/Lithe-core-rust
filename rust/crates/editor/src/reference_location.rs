@@ -50,7 +50,10 @@ struct Symbol {
 /// caller never guesses a package or method signature from the file name.
 pub fn reference_command(payload: Value) -> Result<Value, CoreError> {
     let request: Request = serde_json::from_value(payload).map_err(|_| {
-        CoreError::new(ErrorCode::InvalidRequest, "Invalid reference location request")
+        CoreError::new(
+            ErrorCode::InvalidRequest,
+            "Invalid reference location request",
+        )
     })?;
     if request.path.is_empty() {
         return Err(CoreError::new(
@@ -59,7 +62,10 @@ pub fn reference_command(payload: Value) -> Result<Value, CoreError> {
         ));
     }
     let line = u64::from(request.line) + 1;
-    let position = Position { line: request.line, utf16_column: request.utf16_column };
+    let position = Position {
+        line: request.line,
+        utf16_column: request.utf16_column,
+    };
     let symbol = reference_symbol(&request.symbols, position);
     let (reference, source) = match symbol {
         Some(symbol) => (format!("{symbol}#L{line}"), "symbol"),
@@ -75,7 +81,10 @@ fn contains(range: &Range, position: Position) -> bool {
 fn extent(range: &Range) -> (u32, u32) {
     (
         range.end.line.saturating_sub(range.start.line),
-        range.end.utf16_column.saturating_sub(range.start.utf16_column),
+        range
+            .end
+            .utf16_column
+            .saturating_sub(range.start.utf16_column),
     )
 }
 
@@ -127,7 +136,9 @@ fn reference_symbol(symbols: &[Symbol], position: Position) -> Option<String> {
     let mut types = Vec::new();
     let mut callable = None;
     for symbol in &path {
-        let Some(name) = clean(&symbol.name) else { continue };
+        let Some(name) = clean(&symbol.name) else {
+            continue;
+        };
         match symbol.kind {
             // LSP SymbolKind: Module, Namespace, Package
             2 | 3 | 4 => namespaces.push(name.to_owned()),
@@ -141,7 +152,11 @@ fn reference_symbol(symbols: &[Symbol], position: Position) -> Option<String> {
     // Flat SymbolInformation includes containerName instead of nested children.
     // Use the server's name as-is; it may already be fully qualified.
     if types.is_empty() {
-        if let Some(container) = path.last().and_then(|s| s.container_name.as_deref()).and_then(clean) {
+        if let Some(container) = path
+            .last()
+            .and_then(|s| s.container_name.as_deref())
+            .and_then(clean)
+        {
             types.push(container.to_owned());
         }
     }
@@ -177,17 +192,26 @@ mod tests {
                 }]
             }]
         }]);
-        let data = reference_command(json!({"path":"/tmp/DemoClass.java","line":136,"utf16Column":4,"symbols":symbols})).unwrap();
-        assert_eq!(data["reference"], "com.example.DemoClass#goHome(String,Integer)#L137");
+        let data = reference_command(
+            json!({"path":"/tmp/DemoClass.java","line":136,"utf16Column":4,"symbols":symbols}),
+        )
+        .unwrap();
+        assert_eq!(
+            data["reference"],
+            "com.example.DemoClass#goHome(String,Integer)#L137"
+        );
         assert_eq!(data["source"], "symbol");
     }
 
     #[test]
     fn missing_or_nonmatching_symbols_fall_back_to_path() {
-        for symbols in [json!([]), json!([{
-            "name":"DemoClass","kind":5,
-            "range":{"start":{"line":10,"utf16Column":0},"end":{"line":12,"utf16Column":0}}
-        }])] {
+        for symbols in [
+            json!([]),
+            json!([{
+                "name":"DemoClass","kind":5,
+                "range":{"start":{"line":10,"utf16Column":0},"end":{"line":12,"utf16Column":0}}
+            }]),
+        ] {
             let data = reference_command(json!({"path":"C:/src/DemoClass.java","line":136,"utf16Column":4,"symbols":symbols})).unwrap();
             assert_eq!(data["reference"], "C:/src/DemoClass.java#L137");
             assert_eq!(data["source"], "file");
@@ -200,7 +224,10 @@ mod tests {
             "name":"goHome(String,Integer)","kind":6,"containerName":"DemoClass",
             "range":{"start":{"line":6,"utf16Column":0},"end":{"line":9,"utf16Column":0}}
         }]);
-        let data = reference_command(json!({"path":"file.java","line":7,"utf16Column":0,"symbols":symbols})).unwrap();
+        let data = reference_command(
+            json!({"path":"file.java","line":7,"utf16Column":0,"symbols":symbols}),
+        )
+        .unwrap();
         assert_eq!(data["reference"], "DemoClass#goHome(String,Integer)#L8");
     }
 

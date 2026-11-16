@@ -1318,7 +1318,9 @@ impl CoreCommand {
             "lsp.classifyNavigationTarget" => Some(Self::Lsp(LspCommand::ClassifyNavigationTarget)),
             "lsp.declarationOrUsages" => Some(Self::Lsp(LspCommand::DeclarationOrUsages)),
             "editor.lineEdit" => Some(Self::Editor(EditorCommand::LineEdit)),
-            "editor.copyReferenceLocation" => Some(Self::Editor(EditorCommand::CopyReferenceLocation)),
+            "editor.copyReferenceLocation" => {
+                Some(Self::Editor(EditorCommand::CopyReferenceLocation))
+            }
             "editor.find" => Some(Self::Editor(EditorCommand::Find)),
             "editor.preferences.resolve" => Some(Self::Editor(EditorCommand::PreferencesResolve)),
             "editor.recent.reduce" => Some(Self::Editor(EditorCommand::RecentReduce)),

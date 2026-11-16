@@ -144,7 +144,8 @@ fn copy_reference_location_matches_shared_fixture() {
     .unwrap();
     for case in fixture["cases"].as_array().unwrap() {
         let response: Value = serde_json::from_str(&crate::execute_json(
-            &json!({"command":"editor.copyReferenceLocation","payload":case["request"]}).to_string(),
+            &json!({"command":"editor.copyReferenceLocation","payload":case["request"]})
+                .to_string(),
         ))
         .unwrap();
         assert_eq!(response["ok"], true, "{}: {response}", case["name"]);
