@@ -62,9 +62,12 @@ pub(crate) fn normalize_uri_for_comparison(uri: &str) -> String {
 
 pub(crate) fn workspace_name_from_uri(uri: &str) -> String {
     let decoded = file_path_from_uri(uri);
+    let separator = |character: char| {
+        lithe_platform::paths::is_separator(character, lithe_platform::Platform::HOST)
+    };
     decoded
-        .trim_end_matches(['/', '\\'])
-        .rsplit(['/', '\\'])
+        .trim_end_matches(separator)
+        .rsplit(separator)
         .find(|component| !component.is_empty())
         .unwrap_or("workspace")
         .to_string()

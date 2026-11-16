@@ -117,7 +117,9 @@ fn listable_directory(root: &Path, relative: &str, rules: &VisibilityRules) -> O
     if relative.is_empty() {
         return Some(root.to_path_buf());
     }
-    if Path::new(relative).is_absolute() || invalid_relative_path(relative) {
+    let relative = slash_separated(relative, Platform::HOST);
+    let relative = relative.as_ref();
+    if invalid_relative_path(relative, Platform::HOST) {
         return None;
     }
     let mut current = root.to_path_buf();

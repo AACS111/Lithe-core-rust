@@ -343,11 +343,8 @@ fn location(
     let line = number("line")?;
     let column = number("column")?;
     let windows = platform == "windows";
-    let text = if windows {
-        raw.replace('\\', "/")
-    } else {
-        raw.to_string()
-    };
+    let text = lithe_platform::paths::slash_separated(raw, lithe_toolchain::paths::rules(platform))
+        .into_owned();
     let absolute = text.starts_with('/') || (windows && text.as_bytes().get(1) == Some(&b':'));
     let mut paths = Vec::new();
     if absolute {

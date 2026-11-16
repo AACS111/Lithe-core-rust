@@ -1763,6 +1763,9 @@ fn file_commands_round_trip_and_reject_traversal() {
     assert_eq!(traversal_response["ok"], false);
     assert_eq!(traversal_response["error"]["code"], "invalid_request");
 
+    // Windows reads these as leaving the root and rejects them. On Unix each is
+    // one file name inside the root, and none of them exists. Neither reads
+    // outside the workspace.
     for path in [
         "..\\outside.txt",
         "nested\\..\\outside.txt",
@@ -1777,12 +1780,27 @@ fn file_commands_round_trip_and_reject_traversal() {
             &serde_json::to_string(&request).expect("Windows path request should encode"),
         ))
         .expect("Windows path response should be JSON");
-        assert_eq!(response["ok"], false, "path {path} should be rejected");
-        assert_eq!(response["error"]["code"], "invalid_request");
+        assert_eq!(response["ok"], false, "path {path} should not be read");
     }
 
     #[cfg(unix)]
     {
+        fs::write(root.join("..\\outside.txt"), "inside")
+            .expect("a Unix name with a backslash should be writable");
+        let named = serde_json::json!({
+            "id": "backslash-name",
+            "command": "file.read",
+            "payload": {"root": root, "path": "..\\outside.txt"}
+        });
+        let named_response: Value = serde_json::from_str(&execute_json(
+            &serde_json::to_string(&named).expect("backslash name request should encode"),
+        ))
+        .expect("backslash name response should be JSON");
+        assert_eq!(
+            named_response["data"]["text"], "inside",
+            "{named_response:?}"
+        );
+
         std::os::unix::fs::symlink(&outside, root.join("link"))
             .expect("test symlink should be creatable");
         let symlink_write = serde_json::json!({

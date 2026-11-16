@@ -10,6 +10,7 @@ lithe-diagnostics = { path = "../diagnostics" }
 lithe-document-uri = { path = "../document-uri" }
 lithe-lsp-client = { path = "../lsp-client" }
 lithe-lsp-transport = { path = "../lsp-transport" }
+lithe-platform = { path = "../platform" }
 lithe-plugin-function-relay = { path = "../plugin-function-relay" }
 lithe-plugin-language-servers = { path = "../plugin-language-servers" }
 lithe-plugin-rpc = { path = "../plugin-rpc" }

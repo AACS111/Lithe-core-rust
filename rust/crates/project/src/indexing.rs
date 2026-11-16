@@ -1,7 +1,7 @@
 //! Workspace-owned indexing exclusions, independent of tree visibility and Git writes.
 
 use super::files::{existing_root, is_nested_linked_worktree, relative_path, VisibilityRules};
-use lithe_platform::paths::relative_path_contains;
+use lithe_platform::paths::{invalid_relative_path, relative_path_contains};
 use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
@@ -147,12 +147,8 @@ fn validate_paths(paths: &mut Vec<String>) -> Result<(), CoreError> {
     for path in paths.iter_mut() {
         *path = path.trim_end_matches('/').to_string();
         if path != "."
-            && (path.is_empty()
-                || Path::new(path).is_absolute()
-                || path.contains(['\\', '\0', ':'])
-                || path
-                    .split('/')
-                    .any(|part| part.is_empty() || part == ".." || part == "."))
+            && (invalid_relative_path(path, Platform::HOST)
+                || path.split('/').any(|part| part.is_empty() || part == "."))
         {
             return Err(CoreError::new(
                 ErrorCode::InvalidRequest,

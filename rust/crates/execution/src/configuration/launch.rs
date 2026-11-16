@@ -5,9 +5,7 @@ use super::*;
 /// Extracts existing Run document values; framework goals and runtime semantics stay in providers.
 pub fn provider_launch_inputs(request: ProviderLaunchInputsRequest) -> Result<Value, CoreError> {
     let root = existing_root(&request.root)?;
-    if invalid_relative_path(&request.provider_root)
-        || !project_directory_exists(&root, &request.provider_root)
-    {
+    if !project_directory_exists(&root, &request.provider_root) {
         return Err(CoreError::new(
             ErrorCode::InvalidRequest,
             "The provider instance leaves the workspace.",

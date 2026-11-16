@@ -8,6 +8,7 @@ description = "Debug Adapter Protocol sessions for Lithe: adapter declarations, 
 [dependencies]
 base64 = "0.22"
 lithe-diagnostics = { path = "../diagnostics" }
+lithe-platform = { path = "../platform" }
 lithe-plugin-model = { path = "../plugin-model" }
 lithe-protocol = { path = "../protocol" }
 serde = { version = "1.0", features = ["derive"] }

@@ -58,11 +58,10 @@ pub(crate) fn project_inputs(root: &Path) -> Result<ProjectInputs, CoreError> {
             if !fingerprint_input(&path) {
                 continue;
             }
-            let relative = path
-                .strip_prefix(root)
-                .expect("scan stays within root")
-                .to_string_lossy()
-                .replace('\\', "/");
+            let relative = slash_separated_path(
+                path.strip_prefix(root).expect("scan stays within root"),
+                Platform::HOST,
+            );
             lithe_protocol::cancellation::check()?;
             // The scan lists files through the workspace adapter, so content reads
             // must use the same adapter or remote projects look permanently unreadable.

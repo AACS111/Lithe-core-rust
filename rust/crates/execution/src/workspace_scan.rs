@@ -20,6 +20,8 @@
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore::Match;
+use lithe_platform::paths::slash_separated_path;
+use lithe_platform::Platform;
 use lithe_protocol::CoreError;
 use lithe_workspace::fs;
 use std::collections::BTreeSet;
@@ -449,10 +451,7 @@ fn visit_with_readers(
 }
 
 fn relative(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/")
+    slash_separated_path(path.strip_prefix(root).unwrap_or(path), Platform::HOST)
 }
 
 #[cfg(test)]

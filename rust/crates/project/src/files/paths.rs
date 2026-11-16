@@ -15,15 +15,24 @@ pub(crate) fn existing_root(value: &str) -> Result<PathBuf, CoreError> {
     fs::canonicalize(path).map_err(CoreError::from)
 }
 
-pub(crate) fn safe_relative_path(root: &Path, value: &str) -> Result<PathBuf, CoreError> {
-    let relative = Path::new(value);
-    if relative.is_absolute() || invalid_relative_path(value) {
+/// `value` in the shared `/`-separated form, or an error when it does not
+/// name a path below the workspace root on this host.
+///
+/// Requests may still spell a Windows path with `\`; [`slash_separated`]
+/// turns only this host's separators into `/`.
+fn relative_request_path(value: &str) -> Result<std::borrow::Cow<'_, str>, CoreError> {
+    let value = slash_separated(value, Platform::HOST);
+    if invalid_relative_path(&value, Platform::HOST) {
         return Err(CoreError::new(
             ErrorCode::InvalidRequest,
             "Path must be relative to the workspace",
         ));
     }
-    let path = root.join(relative);
+    Ok(value)
+}
+
+pub(crate) fn safe_relative_path(root: &Path, value: &str) -> Result<PathBuf, CoreError> {
+    let path = root.join(relative_request_path(value)?.as_ref());
     let canonical = fs::canonicalize(path).map_err(CoreError::from)?;
     if !canonical.starts_with(root) {
         return Err(CoreError::new(
@@ -35,14 +44,7 @@ pub(crate) fn safe_relative_path(root: &Path, value: &str) -> Result<PathBuf, Co
 }
 
 pub(crate) fn writable_relative_path(root: &Path, value: &str) -> Result<PathBuf, CoreError> {
-    let relative = Path::new(value);
-    if relative.is_absolute() || invalid_relative_path(value) {
-        return Err(CoreError::new(
-            ErrorCode::InvalidRequest,
-            "Path must be relative to the workspace",
-        ));
-    }
-    let path = root.join(relative);
+    let path = root.join(relative_request_path(value)?.as_ref());
     if let Some(parent) = path.parent() {
         let mut existing_parent = parent;
         while !fs::try_exists(existing_parent)? {
@@ -76,22 +78,15 @@ pub(crate) fn writable_relative_path(root: &Path, value: &str) -> Result<PathBuf
     Ok(path)
 }
 
+/// `path` relative to `root` in the shared `/`-separated form. Only this
+/// host's separators become `/`, so a Unix name containing `\` stays one
+/// component.
 pub(crate) fn relative_path(path: &Path, root: &Path) -> String {
-    path.strip_prefix(root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/")
+    slash_separated_path(path.strip_prefix(root).unwrap_or(path), Platform::HOST)
         .trim_matches('/')
         .to_string()
 }
 
 pub(crate) fn safe_relative_path_string(value: &str) -> Result<String, CoreError> {
-    let path = Path::new(value);
-    if path.is_absolute() || invalid_relative_path(value) {
-        return Err(CoreError::new(
-            ErrorCode::InvalidRequest,
-            "Path must be relative to the workspace",
-        ));
-    }
-    Ok(value.replace('\\', "/").trim_matches('/').to_string())
+    Ok(relative_request_path(value)?.trim_matches('/').to_string())
 }

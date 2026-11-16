@@ -2,7 +2,9 @@
 
 use crate::contracts::{HistoryEntriesResponse, HistoryEntryResponse};
 use crate::files::VisibilityRules;
-use lithe_protocol::{invalid_relative_path, CoreError, ErrorCode};
+use lithe_platform::paths::{invalid_relative_path, slash_separated, slash_separated_path};
+use lithe_platform::Platform;
+use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -874,11 +876,12 @@ fn read_entries(directory: &Path, storage: &Path) -> Vec<StoredEntry> {
                 return (value.version == HISTORY_VERSION).then_some(value);
             }
             let legacy = serde_json::from_slice::<LegacyStoredEntry>(&data).ok()?;
-            let content = PathBuf::from(legacy.content_url)
-                .strip_prefix(storage)
-                .ok()?
-                .to_string_lossy()
-                .replace('\\', "/");
+            let content = slash_separated_path(
+                PathBuf::from(legacy.content_url)
+                    .strip_prefix(storage)
+                    .ok()?,
+                Platform::HOST,
+            );
             Some(StoredEntry {
                 version: HISTORY_VERSION,
                 id: legacy.id,
@@ -1162,14 +1165,14 @@ fn storage_root(value: &str) -> Result<PathBuf, CoreError> {
 }
 
 fn safe_relative_path(value: &str) -> Result<String, CoreError> {
-    let path = Path::new(value);
-    if path.is_absolute() || invalid_relative_path(value) {
+    let value = slash_separated(value, Platform::HOST);
+    if invalid_relative_path(&value, Platform::HOST) {
         return Err(CoreError::new(
             ErrorCode::InvalidRequest,
             "Path must be relative",
         ));
     }
-    let normalized = value.replace('\\', "/").trim_matches('/').to_string();
+    let normalized = value.trim_matches('/').to_string();
     if normalized.is_empty() {
         return Err(CoreError::new(
             ErrorCode::InvalidRequest,

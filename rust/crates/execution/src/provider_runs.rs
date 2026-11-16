@@ -3,6 +3,7 @@
 
 use super::configuration::{BuildProviderRunReference, RunConfiguration};
 use super::types::{Confidence, RunCategory};
+use lithe_platform::paths::invalid_portable_relative_path;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -34,10 +35,8 @@ pub(super) fn validate(runs: &[ProviderRunConfiguration]) -> Result<(), CoreErro
         if run.name.trim().is_empty()
             || run.name.len() > 4096
             || run.name.chars().any(char::is_control)
-            || lithe_protocol::invalid_relative_path(&run.project_path)
-            || run.project_path.is_empty()
+            || invalid_portable_relative_path(&run.project_path)
             || run.project_path.len() > 4096
-            || run.project_path.contains(['\\', '\0'])
             || !contains(&run.reference.root, &run.project_path)
             || !run.reference.user_arguments.is_empty()
             || !identities.insert(run.reference.generated_id())

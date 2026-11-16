@@ -1,5 +1,7 @@
 //! Chooses an existing configuration for a provider-supplied entry identity.
 
+use lithe_platform::paths::slash_separated;
+use lithe_platform::Platform;
 use serde::Deserialize;
 
 /// One already-resolved configuration; Core performs no provider-specific discovery.
@@ -38,7 +40,7 @@ pub struct ContextSelectionRequest {
 pub fn select_context_configuration(request: ContextSelectionRequest) -> Option<String> {
     let path_key = |path: &str| {
         if request.case_insensitive_paths {
-            path.replace('\\', "/").to_lowercase()
+            slash_separated(path, Platform::Windows).to_lowercase()
         } else {
             path.to_owned()
         }

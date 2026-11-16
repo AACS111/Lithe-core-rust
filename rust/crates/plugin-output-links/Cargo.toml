@@ -7,6 +7,7 @@ description = "Output link matchers plugins declare, console-line matching and r
 
 [dependencies]
 lithe-document-uri = { path = "../document-uri" }
+lithe-platform = { path = "../platform" }
 lithe-plugin-model = { path = "../plugin-model" }
 lithe-protocol = { path = "../protocol" }
 lithe-toolchain = { path = "../toolchain" }

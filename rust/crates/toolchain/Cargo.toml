@@ -7,6 +7,7 @@ description = "Plugin-owned toolchain policy for Lithe: tool definitions, direct
 
 [dependencies]
 ignore = "=0.4.33"
+lithe-platform = { path = "../platform" }
 lithe-plugin-model = { path = "../plugin-model" }
 lithe-protocol = { path = "../protocol" }
 regex = "1.11"

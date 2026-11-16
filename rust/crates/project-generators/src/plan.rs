@@ -277,10 +277,13 @@ fn template_files(
 
     let mut files = Vec::with_capacity(relative_files.len());
     for relative in relative_files {
-        let relative_text = relative
-            .to_str()
-            .ok_or_else(|| template_error("A template path is not UTF-8.".into()))?
-            .replace('\\', "/");
+        let relative_text = lithe_platform::paths::slash_separated(
+            relative
+                .to_str()
+                .ok_or_else(|| template_error("A template path is not UTF-8.".into()))?,
+            lithe_platform::Platform::HOST,
+        )
+        .into_owned();
         let full = root.join(&relative);
         let metadata = fs::symlink_metadata(&full)
             .map_err(|error| template_error(format!("{relative_text}: {error}")))?;

@@ -1,6 +1,8 @@
 //! Appending patterns to `.gitignore` and `.git/info/exclude`.
 
 use super::*;
+use lithe_platform::paths::slash_separated;
+use lithe_platform::Platform;
 
 /// Chooses whether ignore patterns belong to the shared repository file or the
 /// current checkout's local Git metadata.
@@ -62,7 +64,7 @@ fn git_ignore_patterns(paths: &[String]) -> Result<Vec<String>, CoreError> {
                 "Git ignore operation contains an invalid path",
             ));
         }
-        let normalized = path.replace('\\', "/");
+        let normalized = slash_separated(path, Platform::HOST);
         let is_directory = normalized.ends_with('/');
         let normalized = normalized.trim_end_matches('/');
         if !is_safe_pathspec(normalized) {
@@ -75,7 +77,9 @@ fn git_ignore_patterns(paths: &[String]) -> Result<Vec<String>, CoreError> {
         let mut escaped = String::with_capacity(normalized.len() + 2);
         escaped.push('/');
         for character in normalized.chars() {
-            if matches!(character, '*' | '?' | '[' | ']' | '#' | '!' | ' ') {
+            // A backslash left after separator conversion is part of a Unix
+            // file name, and Git ignore patterns read it as an escape.
+            if matches!(character, '*' | '?' | '[' | ']' | '#' | '!' | ' ' | '\\') {
                 escaped.push('\\');
             }
             escaped.push(character);

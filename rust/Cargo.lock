@@ -964,6 +964,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "lithe-diagnostics",
+ "lithe-platform",
  "lithe-plugin-model",
  "lithe-protocol",
  "serde",
@@ -998,6 +999,7 @@ dependencies = [
 name = "lithe-document-uri"
 version = "0.1.0"
 dependencies = [
+ "lithe-platform",
  "lithe-protocol",
  "serde",
  "serde_json",
@@ -1031,6 +1033,7 @@ version = "0.1.0"
 dependencies = [
  "ignore",
  "lithe-diagnostics",
+ "lithe-platform",
  "lithe-plugin-model",
  "lithe-protocol",
  "lithe-toolchain",
@@ -1109,6 +1112,7 @@ version = "0.1.0"
 dependencies = [
  "lithe-diagnostics",
  "lithe-document-uri",
+ "lithe-platform",
  "lithe-plugin-editor",
  "lithe-plugin-keymap-import",
  "lithe-plugin-model",
@@ -1130,6 +1134,7 @@ dependencies = [
  "lithe-git",
  "lithe-lsp-client",
  "lithe-lsp-transport",
+ "lithe-platform",
  "lithe-plugin-editor",
  "lithe-plugin-function-relay",
  "lithe-plugin-language-servers",
@@ -1151,6 +1156,7 @@ version = "0.1.0"
 dependencies = [
  "lithe-core-rules",
  "lithe-document-uri",
+ "lithe-platform",
  "lithe-protocol",
  "serde",
  "serde_json",
@@ -1340,6 +1346,7 @@ name = "lithe-plugin-output-links"
 version = "0.1.0"
 dependencies = [
  "lithe-document-uri",
+ "lithe-platform",
  "lithe-plugin-model",
  "lithe-protocol",
  "lithe-toolchain",
@@ -1501,6 +1508,7 @@ name = "lithe-toolchain"
 version = "0.1.0"
 dependencies = [
  "ignore",
+ "lithe-platform",
  "lithe-plugin-model",
  "lithe-protocol",
  "regex",
