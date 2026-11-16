@@ -1187,6 +1187,7 @@ version = "0.1.0"
 name = "lithe-platform-tests"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "lithe-git-host",
  "lithe-lsp-transport",
  "lithe-platform",
