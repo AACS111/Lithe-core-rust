@@ -435,7 +435,7 @@
       "expectedCode": "plugin.manifest.invalid"
     },
     {
-      "name": "host-managed runtime with its own executables",
+      "name": "runtime minimum version with a command candidate but no probe",
       "base": "build-command-stdout.plugin.json",
       "edits": [{ "op": "set", "path": "/buildSystems/0/invocation/runtimeDependencies/0/executables", "value": [{ "kind": "command", "command": "go" }] }],
       "expectedCode": "plugin.manifest.invalid"

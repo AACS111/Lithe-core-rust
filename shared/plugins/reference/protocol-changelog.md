@@ -137,6 +137,7 @@
 
 | PR | 修改人 | API 编号 | 协议 / 能力 | 改了什么 |
 | --- | --- | --- | --- | --- |
+| [#69](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/69) | [@xiaoyumuxi](https://github.com/xiaoyumuxi) | API-23 | `buildSystems` 0 内的修正 | Core 不再把 `go`、`node` 当作宿主管理的运行时（[1lck/Lithe-IDEA#1856](https://github.com/1lck/Lithe-IDEA/issues/1856) 第 3 项）：`runtimeDependencies` 里没有 `executables` 的运行时一律按同 ID 的工具定义解析，`go`、`node` 也不例外。`build.invocationPlan` 对它们返回 `{ "kind": "toolchain", "toolchainID": <id>, "root": <root> }` 和 `version: null`，不再返回 `{ "kind": "runtime" }` 候选和 Core 自带的版本参数（`["version"]`、`["--version"]`）；`build.checkToolVersion` 对它们以 `plugin.build.unavailable` 拒绝，版本由工具定义检查。运行时计划删掉 `hostManaged` 字段。`go`、`node` 写了自己的 `executables` 时按普通运行时校验，不再报“由宿主发现”。已发布的清单不用改：Go 插件本来就提供 `go` 工具定义。没有新增方法、字段或能力版本。 |
 | [#61](https://github.com/Lithe-IDEA/Lithe-core-rust/pull/61) | [@xiaoyumuxi](https://github.com/xiaoyumuxi) | — | `languageServers` 0 内的补充 | LSP 引擎在一次会话里保留语言服务器的悬浮提示答案（[1lck/Lithe-IDEA#1995](https://github.com/1lck/Lithe-IDEA/issues/1995)）：同一文档版本的同一位置，或答案 `range` 在同一行内覆盖的位置，直接用保留的答案完成请求，不再发 `textDocument/hover`。每个会话最多 32 个，先丢最久没用的；空答案、错误、文本超过 64 KiB 的答案和清空之后才到达的答案照常交付但不保留。文档打开、修改、保存、关闭，工作区文件变化，设置或索引排除项变化，运行命令，后端的 `languageServer/request`、`languageServer/notify` 和宿主通知，服务器发来的任何请求和 `$/progress` 结束，以及会话停止时全部清空。`requestCompleted` 的结果形状不变，没有新增方法、字段或能力版本。 |
 
 ### 2026-11-15
