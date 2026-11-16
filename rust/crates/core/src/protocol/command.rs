@@ -546,8 +546,11 @@ pub enum WorkspaceCommand {
     /// Classifies a batch of workspace-relative paths as hidden or visible (`workspace.classifyVisibility`).
     /// The rule lives in `lithe-core-rules` so the Windows frontend can run it synchronously.
     ClassifyVisibility,
-    /// Returns the built-in hidden-path lists (`workspace.visibilityDefaults`), also from `lithe-core-rules`.
+    /// Returns the default hidden-path lists (`workspace.visibilityDefaults`), also from `lithe-core-rules`.
     VisibilityDefaults,
+    /// Replaces the folder names the enabled plugins hide in every workspace
+    /// (`workspace.configureVisibility`), collected from their validated manifests.
+    ConfigureVisibility,
 }
 
 #[derive(Debug, Clone)]
@@ -1270,6 +1273,9 @@ impl CoreCommand {
             }
             "workspace.visibilityDefaults" => {
                 Some(Self::Workspace(WorkspaceCommand::VisibilityDefaults))
+            }
+            "workspace.configureVisibility" => {
+                Some(Self::Workspace(WorkspaceCommand::ConfigureVisibility))
             }
             "workbench.chromeLayout.reduce" => Some(Self::WorkbenchChromeLayoutReduce),
             "workbench.notifications.reduceReadState" => {

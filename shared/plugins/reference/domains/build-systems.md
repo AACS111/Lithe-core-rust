@@ -35,7 +35,7 @@
 | `provider` | 没有命令能打印模型时，由[构建提供者](build-providers.md)回答模型和依赖请求 |
 | `tasks`、`run`、`test` | 任务目录、从模型目标或任务生成的运行入口、测试的范围、过滤器和结果文件 |
 | `diagnostics`、`dependencies` | 诊断的行匹配或 `litheDiagnostics`；依赖列表或依赖树的来源 |
-| `sync`、`layout` | 哪些文件变化会让模型过期；每个项目要作为 `excluded` 内容根加入的目录 |
+| `sync`、`layout` | 哪些文件变化会让模型过期；每个项目要作为 `excluded` 内容根加入的目录；`layout.hiddenDirectoryNames` 是插件启用期间所有工作区在任意层级隐藏的目录名（如依赖、缓存和构建输出目录），项目树、搜索、文件事件、本地历史、运行发现、构建探测和仓库发现都会跳过 |
 
 ### 模型来源
 
@@ -132,7 +132,7 @@ IDs of build systems, tasks, and run entries start with a lowercase letter and u
 | `provider` | The [build provider](build-providers.md) that answers model and dependency requests when no command prints them |
 | `tasks`, `run`, `test` | The task catalog, run entries generated from model targets or tasks, and the scopes, filters, and result files of tests |
 | `diagnostics`, `dependencies` | Line matchers or `litheDiagnostics` for diagnostics; the source of the dependency list or tree |
-| `sync`, `layout` | Which file changes make the model stale; directories added to every project as `excluded` content roots |
+| `sync`, `layout` | Which file changes make the model stale; directories added to every project as `excluded` content roots; `layout.hiddenDirectoryNames`, folder names such as dependency, cache and build output folders that every workspace hides at any depth while the plugin is enabled: the project tree, search, file events, Local History, run discovery, build detection and repository discovery skip them |
 
 ### Model sources
 

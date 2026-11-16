@@ -1185,7 +1185,7 @@ fn working_directory_override_must_name_an_existing_project_directory() {
 }
 
 #[test]
-fn shared_run_scan_excludes_caches_and_keeps_hidden_sources() {
+fn shared_run_scan_excludes_hidden_folders_and_keeps_dot_named_sources() {
     let root = temporary_root("shared-run-scan");
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -1195,14 +1195,14 @@ fn shared_run_scan_excludes_caches_and_keeps_hidden_sources() {
     }
     fs::create_dir_all(&root).unwrap();
     let _cleanup = Cleanup(root.clone());
-    // Core scans the workspace itself: cache directories are left out, a hidden
-    // source directory stays.
+    // Core scans the workspace itself: the folders it hides are left out at any
+    // depth, a dot-named source directory stays.
     for path in [
         ".sources/Makefile",
         "src/Makefile",
-        ".pytest_cache/Makefile",
-        "node_modules/Makefile",
-        "target/Makefile",
+        ".git/Makefile",
+        ".worktrees/feature/Makefile",
+        "app/.worktree/Makefile",
     ] {
         let file = root.join(path);
         fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -1226,9 +1226,9 @@ fn shared_run_scan_excludes_caches_and_keeps_hidden_sources() {
     assert!(inputs.contains_key(".sources/Makefile"));
     assert!(inputs.contains_key("src/Makefile"));
     assert!(!inputs.keys().any(|path| {
-        path.starts_with(".pytest_cache/")
-            || path.starts_with("node_modules/")
-            || path.starts_with("target/")
+        path.starts_with(".git/")
+            || path.starts_with(".worktrees/")
+            || path.starts_with("app/.worktree/")
     }));
     let mut document = generated["generated"].clone();
     // A persisted incomplete baseline cannot certify freshness or infer deletion,

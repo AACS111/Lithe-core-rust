@@ -260,6 +260,16 @@ impl VcsProviderDeclaration {
             "mayUseNetwork": self.may_use_network,
         })
     }
+
+    /// Names of the directory markers, such as `.svn`: the VCS's own
+    /// metadata, which every workspace hides while the plugin is enabled.
+    pub fn metadata_directory_names(&self) -> impl Iterator<Item = &str> {
+        self.detection
+            .markers
+            .iter()
+            .filter(|marker| marker.kind == MarkerKind::Directory)
+            .map(|marker| marker.name.as_str())
+    }
 }
 
 /// Activation event the host raises before starting a VCS provider, once a

@@ -227,14 +227,25 @@ runs every case of `rust/fixtures/editor/group-layout-v1.json` through them.
 and returns `{hidden: boolean[], watchedDespiteHiding: boolean[]}` with one answer per entry, in request order. `path`
 is workspace-relative with `/` separators; `isDirectory` is `true` for a folder, `false` for a file and omitted when the
 host does not know (every component may then be a folder). The two lists are the user's own entries: Core adds the
-built-in folders and patterns, and a `!entry` turns a built-in off. Matching ignores case. A folder name hides the folder,
+default folders and patterns, and a `!entry` turns a default off. Matching ignores case. A folder name hides the folder,
 everything below it and a file with that exact name (a linked worktree's `.git` file). `hidden` means the tree, search and
 Local History leave the path out; `watchedDespiteHiding` marks the hidden project configuration folder (`.lithe`) whose file
 events must still be delivered, except the built-in noise below it such as `.lithe/run/local.json`. Hosts send all children
-of a directory in one call. `workspace.visibilityDefaults` takes `{}` and returns the built-in lists
+of a directory in one call. `workspace.visibilityDefaults` takes `{}` and returns the default lists
 (`hiddenDirectoryNames`, `hiddenFilePatterns`, `builtInPatterns`, `configurationDirectory`, `configurationPattern`) so hosts
 display them without keeping a copy. Both live in `rust/crates/core-rules` like `keymap.modifierGestureStep` and are tested
 against `rust/fixtures/workspace/visibility-v1.json`.
+
+The default folders are Core's own (`.git`, `.worktree`, `.worktrees`) plus the folder names the enabled plugins declare;
+Core names no language or tool folder itself. The default file patterns are `.DS_Store`, the root `.lithe/**` and
+`.lithe/run/local.json`. `workspace.configureVisibility` accepts `{plugins: [{manifest}]}`, the manifests of every enabled
+plugin, and replaces the declared names with theirs: each build system's `layout.hiddenDirectoryNames` (its generated
+output, such as `target`) and the directory markers of each VCS provider (its metadata, such as `.svn`). It returns
+`{hiddenDirectoryNames, rejected: [{index, error}]}`: every declared name, sorted, and the manifests that failed
+validation, which contribute nothing. The names are process-wide and apply from the next request, listing or scan: the
+tree, search, file events, Local History's default ignored folders, run discovery, build detection and VCS root and
+repository discovery. Hosts send the full list at startup and whenever a plugin is enabled, disabled, installed or
+removed; `{plugins: []}` clears it. A malformed payload is `invalid_request`.
 
 ## Terminal link targets
 
@@ -542,11 +553,11 @@ or removing a command fails until the table changes in the same commit.
 | `plugins.marketplace.validateIndex` | Validate a marketplace index and report each plugin's availability for one platform |
 | `plugins.marketplace.resolveSource` | Resolve a user-entered marketplace source to the index URL to fetch |
 | `plugins.marketplace.installReview` | List a package's permissions and programs, and those not yet approved |
-| `workspace.snapshot` | Enumerate visible workspace nodes and relative file paths; `nestedWorktrees` lists linked worktrees checked out inside their own repository, which are left out of the tree, files, and search index; the built-in hidden names are skipped without being read, and include `node_modules`, Python virtual environments (`.venv`, `venv`), `__pycache__` and `*.pyc` files; `includeTree: false` returns only `files` and a childless `root`; `files` (and the tree, when included) keep the lowercase traversal order that bounded consumers such as Windows Quick Open rely on, not the natural display order of `workspace.listDirectories` |
+| `workspace.snapshot` | Enumerate visible workspace nodes and relative file paths; `nestedWorktrees` lists linked worktrees checked out inside their own repository, which are left out of the tree, files, and search index; hidden folders, Core's own and the ones enabled plugins declare through `workspace.configureVisibility`, are skipped without being read; `includeTree: false` returns only `files` and a childless `root`; `files` (and the tree, when included) keep the lowercase traversal order that bounded consumers such as Windows Quick Open rely on, not the natural display order of `workspace.listDirectories` |
 | `workspace.releaseIndexing` | Retire a policy and clear index/cache data at project close; accepts `root`, optional `ownerId`, and that owner's last observed `revision`, returns `released`; an old close must not retire a new generation |
 | `workspace.configureIndexing` | Install a process-local, canonical-root indexing policy before workspace consumers run; returns a monotonic revision, effective directory reasons and Git failure state; see `rust/fixtures/workspace/indexing-policy-v1.json` |
 | `workspace.refreshIndexing` | Refresh external Git decisions for a live `root`, `ownerId`, `revision` lease without changing preferences or release tokens; returns lazy `IndexingStatus` |
-| `workspace.filterChanges` | Filter an array of workspace-relative paths, or `{ paths, hiddenFilePatterns }` whose `!` entries turn default exclusions off, against Core's default build/cache exclusions; preserve order, spelling, and the empty root path. Native event loss bypasses filtering. Hosts relativize to the most specific explicit watch root and retain explicitly watched files |
+| `workspace.filterChanges` | Filter an array of workspace-relative paths, or `{ paths, hiddenFilePatterns }` whose `!` entries turn default exclusions off, against Core's default hidden folders and patterns, including the folders enabled plugins declare; preserve order, spelling, and the empty root path. Native event loss bypasses filtering. Hosts relativize to the most specific explicit watch root and retain explicitly watched files |
 | `workspace.listDirectories` | Return one visible level of children for each requested workspace-relative directory (`""` is the root); missing, hidden, symlinked, or nested-worktree paths are omitted, and each listing reports the nested worktrees it left out. Child directories have `children: []` only when a shallow probe proves them visibly empty; otherwise children remain omitted (unloaded), with no recursive tree allocation. Children list directories first, then names in IDEA's natural file-name order (digit runs compare by value, case-insensitive, `-` next to `_`; fixture `rust/fixtures/workspace/file-name-order-v1.json`) |
 | `workspace.orderEntries` | Order natively enumerated directory siblings |
 | `workspace.projectTree.rows` | Say which loaded project tree nodes show as rows, keep the selection on a row that shows, and find the row the top of the view was on, without reading the disk (from `lithe-project-tree`) |
@@ -605,7 +616,8 @@ or removing a command fails until the table changes in the same commit.
 | `editor.groupLayout.reduce` | Apply one transition to the editor groups and the tree that divides the editor area among them: a workbench state action, opening a tab, dropping a dragged tab or removing empty groups (from `lithe-editor-layout`) |
 | `editor.groupLayout.dropTargets` | Say which places of each editor group accept a dragged tab (from `lithe-editor-layout`) |
 | `workspace.classifyVisibility` | Classify a batch of workspace-relative paths as hidden or visible. The rule lives in `lithe-core-rules` so the Windows frontend can run it synchronously |
-| `workspace.visibilityDefaults` | Return the built-in hidden-path lists (from `lithe-core-rules`) |
+| `workspace.visibilityDefaults` | Return the default hidden-path lists, Core's own and the folders enabled plugins declare (from `lithe-core-rules`) |
+| `workspace.configureVisibility` | Replace the folder names enabled plugins declare as hidden (build systems' `layout.hiddenDirectoryNames`, VCS providers' directory markers) and return them with the rejected manifests |
 | `workbench.chromeLayout.reduce` | Apply one transition to the rearrangeable workbench chrome: stripe, title bar and status bar button placement, hidden stripe buttons and open tool panels (from `lithe-core-rules`) |
 | `workbench.notifications.reduceReadState` | Apply one notification arrival or mark a window's history read; return bounded unread identities and the ready-to-render count (from `lithe-core-rules`) |
 | `terminal.parseLinkTarget` | Resolve terminal link candidates into file or external targets |
@@ -923,9 +935,9 @@ becomes a listed repository when Git can open it: a `.git` directory needs
 the marker's directory) that exists and holds `HEAD`. A stale submodule or
 worktree pointer whose gitdir was removed is not listed, because status and
 reference loads for the whole workspace would otherwise fail for it. The default traversal
-skips dot-prefixed descendant directories and the built-in workspace hidden
-directory names (including `.build`, `node_modules`, `.venv`, `venv`, `__pycache__`,
-`target`, `build`, `DerivedData`, `dist` and `coverage`). `.worktree` and `.worktrees` remain
+skips dot-prefixed descendant directories and the folder names enabled plugins
+declare through `workspace.configureVisibility` (such as a build system's `target`).
+`.worktree` and `.worktrees` remain
 traversable checkout containers; the same exclusions apply inside them.
 Traversal continues below eligible discovered repositories, including ordinary
 `vendor` source checkouts. An explicitly opened root and its containing repository
@@ -2334,10 +2346,10 @@ scheme's ignored-file color; Windows tolerates the optional status but does not
 currently render this foreground.
 
 `includeGeneratedFileNames` opts into a separate in-memory names-only index:
-built-in build/dependency directory exclusions (including `.build` and `target`)
-do not suppress names, even when callers pass the same default exclusions.
-Git metadata and nested worktrees remain excluded; custom directory names and
-file/path globs still apply. It does not enable generated-file content or symbol
+the folders enabled plugins declare as generated output (a build system's
+`layout.hiddenDirectoryNames`, such as `target`) do not suppress names, even when
+callers also pass them. VCS metadata, Core's own folders and nested worktrees remain
+excluded; other custom directory names and file/path globs still apply. It does not enable generated-file content or symbol
 indexing and does not change `workspace.search`, tree, watcher, or replacement
 visibility. Names share index invalidation and reported file updates; changes
 inside unwatched generated directories require workspace/index refresh. No index
@@ -3377,8 +3389,8 @@ and an optional `storageLimitBytes` (default
 Patterns use the hidden-path glob syntax; regexes use Rust `regex` syntax,
 case-insensitive, matched unanchored against the `/`-separated relative path.
 A matching file is not recorded, existing entries stay listed, and an invalid
-or empty regex never matches. Built-in dependency, cache and build output
-folders (such as `node_modules`, `.venv`, `target`) also apply as `**/name/`
+or empty regex never matches. The default hidden folders, Core's own and the
+ones enabled plugins declare (such as a build system's `target`), also apply as `**/name/`
 patterns, for baselines and edits alike; a `!**/name/` or `!name` pattern turns
 one off, and saving drops baselines the current rules reject. `history.ignorePreview` accepts the
 same `ignoreRules`, optional `hiddenFilePatterns`, an optional relative

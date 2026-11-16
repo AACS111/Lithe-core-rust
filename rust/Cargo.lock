@@ -1032,6 +1032,7 @@ name = "lithe-execution"
 version = "0.1.0"
 dependencies = [
  "ignore",
+ "lithe-core-rules",
  "lithe-diagnostics",
  "lithe-platform",
  "lithe-plugin-model",
@@ -1521,6 +1522,7 @@ dependencies = [
 name = "lithe-vcs"
 version = "0.1.0"
 dependencies = [
+ "lithe-core-rules",
  "lithe-plugin-model",
  "lithe-protocol",
  "serde",

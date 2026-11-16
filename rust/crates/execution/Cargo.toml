@@ -11,6 +11,7 @@ test-support = []
 
 [dependencies]
 ignore = "=0.4.33"
+lithe-core-rules = { path = "../core-rules" }
 lithe-diagnostics = { path = "../diagnostics" }
 lithe-platform = { path = "../platform" }
 lithe-plugin-model = { path = "../plugin-model" }
