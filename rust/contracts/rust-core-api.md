@@ -1181,7 +1181,7 @@ Each event has `operationId` and `type`:
 | Type | Additional fields |
 | --- | --- |
 | `requestStarted` | none; cancellation is registered before delivery |
-| `started` | `invocationId`, `workingDirectory`, `arguments`, nullable resolved `executable`, `temporaryConfig` key/value pairs, `displayArguments`, `globalArguments`, `source`, `query` |
+| `started` | `invocationId`, `workingDirectory`, `arguments`, nullable resolved `executable`, `temporaryConfig` key/value pairs, `displayArguments`, `globalArguments`, `source`, `query`, and a query's `queryCategory` when it has one |
 | `output` | `invocationId`, `stream` (`stdout`/`stderr`), `text`, `progress`, `truncated`, optional `progressDetails` (`stage`, nullable `percent`, `completed`, `total`) |
 | `finished` | `invocationId`, nullable `exitCode`, monotonic `durationMilliseconds`, nullable `error`, `expectedExit` |
 | `requestFinished` | nullable `error`, including failures before a child started; `unconfirmedInvocations`, the started records without `finished`; `failureRecord`, true when `error` is set, is not a cancellation, and no record of the request failed or is unconfirmed, so the host shows the error as its own record |
@@ -1261,7 +1261,12 @@ tell apart; otherwise Core derives it from the request command: `diff` for `git.
 `git.comparison` and `git.planDiffBlocks`; `log` for history, reference, tag, commit and
 graph reads; `annotate` for `git.blame` and `git.lineHistory`; `panels` for worktree,
 stash, remote, pull request, untracked directory, repository setup and execution inspection
-reads; and `checks` for every other Git command. Commands outside Git have no category.
+reads; and `checks` for every other Git command. Commands outside Git have no category, and
+neither have the queries of a `background` request that names none. The `queryCategories`
+list of the fixture below names every category; `gitExecution` rejects any other name. A
+reported query's `started` event carries its `queryCategory`, so a host that stops
+recording a category can drop the successful queries of it that it kept; a visible command,
+and a query of no category, carries none.
 A query whose category the console does not record emits no events while it succeeds, so it
 never consumes the console's capacity. If it fails (an error, or a nonzero exit that does not
 answer its question) in a request whose provenance is not `background`, Core sends its

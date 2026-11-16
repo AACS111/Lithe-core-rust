@@ -100,19 +100,23 @@ pub(super) fn source() -> super::console::Source {
     }
 }
 
-/// Whether the running request's internal queries are recorded: the category the host named,
-/// or else the request command's, is one the console records. A `background` request without
-/// a named category is an automatic refresh or watcher, which runs too often to record.
-pub(super) fn reports_queries() -> bool {
+/// The category of the running request's internal queries: the one the host named, or else
+/// the request command's. A `background` request without a named category is an automatic
+/// refresh or watcher, whose queries belong to no category.
+pub(super) fn query_category() -> Option<QueryCategory> {
     let options = current();
-    options
-        .query_category
-        .or_else(|| {
-            (source() != super::console::Source::Background)
-                .then_some(options.command_category)
-                .flatten()
-        })
-        .is_some_and(|category| options.console_queries.contains(&category))
+    options.query_category.or_else(|| {
+        (source() != super::console::Source::Background)
+            .then_some(options.command_category)
+            .flatten()
+    })
+}
+
+/// Whether the running request's internal queries are recorded: their category is one the
+/// console records. Queries of no category, those of an automatic refresh or watcher, run too
+/// often to record.
+pub(super) fn reports_queries() -> bool {
+    query_category().is_some_and(|category| current().console_queries.contains(&category))
 }
 
 /// Whether the running request's unrecorded queries still report a failure: a request that
@@ -298,6 +302,23 @@ mod tests {
             "../../../fixtures/git/console-queries-v1.json"
         ))
         .unwrap();
+        // Hosts read the whole list from the fixture. The match fails to compile when a
+        // category is added, so the list cannot fall behind the enum.
+        use super::super::console::QueryCategory::*;
+        let categories: Vec<super::super::console::QueryCategory> =
+            serde_json::from_value(fixture["queryCategories"].clone()).unwrap();
+        let positions = categories.iter().map(|category| match category {
+            References => 0,
+            Reload => 1,
+            DiffRefresh => 2,
+            Diff => 3,
+            Log => 4,
+            LogPathFilter => 5,
+            Annotate => 6,
+            Panels => 7,
+            Checks => 8,
+        });
+        assert!(positions.eq(0..9), "{categories:?}");
         for (command, category) in fixture["categories"].as_object().unwrap() {
             assert_eq!(
                 serde_json::json!(super::super::console::category::of_command(command)),

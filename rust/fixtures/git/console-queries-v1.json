@@ -1,5 +1,16 @@
 {
   "version": 1,
+  "queryCategories": [
+    "references",
+    "reload",
+    "diffRefresh",
+    "diff",
+    "log",
+    "logPathFilter",
+    "annotate",
+    "panels",
+    "checks"
+  ],
   "categories": {
     "git.diff": "diff",
     "git.comparison": "diff",

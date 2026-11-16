@@ -48,6 +48,10 @@ enum Kind<'a> {
         /// An internal query reported because the console records its category, as opposed
         /// to a command the workflow runs visibly; consoles fold a query's output by default.
         query: bool,
+        /// The category of a query, so a console can drop the queries of a category it stops
+        /// recording; absent for a visible command and a query of no category.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        query_category: Option<super::console::QueryCategory>,
     },
     Output {
         invocation_id: u64,
@@ -224,6 +228,10 @@ impl Invocation {
                 working_directory: root,
                 arguments: &arguments,
                 query: self.query,
+                query_category: self
+                    .query
+                    .then(super::execution_policy::query_category)
+                    .flatten(),
             },
         );
     }
@@ -633,13 +641,23 @@ mod tests {
         let marks: Vec<_> = events
             .iter()
             .filter(|event| event["type"] == "started")
-            .map(|event| (event["arguments"][0].clone(), event["query"].clone()))
+            .map(|event| {
+                (
+                    event["arguments"][0].clone(),
+                    event["query"].clone(),
+                    event.get("queryCategory").cloned(),
+                )
+            })
             .collect();
         assert_eq!(
             marks,
             [
-                (serde_json::json!("log"), serde_json::json!(true)),
-                (serde_json::json!("commit"), serde_json::json!(false))
+                (
+                    serde_json::json!("log"),
+                    serde_json::json!(true),
+                    Some(serde_json::json!("log"))
+                ),
+                (serde_json::json!("commit"), serde_json::json!(false), None)
             ]
         );
     }
