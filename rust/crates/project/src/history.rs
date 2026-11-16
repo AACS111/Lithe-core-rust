@@ -44,10 +44,10 @@ pub struct HistoryRecordRequest {
     /// Whether recording also drops expired snapshots and enforces the storage cap; defaults to true.
     #[serde(default = "default_prune_expired")]
     pub prune_expired: bool,
-    /// Extra directory names hidden from the tree, on top of the built-in ones.
+    /// Extra directory names hidden from the tree, on top of the default ones.
     #[serde(default)]
     pub hidden_directory_names: Vec<String>,
-    /// Hidden-path globs; `!` lines turn built-in hidden folders back on.
+    /// Hidden-path globs; `!` lines turn default hidden folders back on.
     #[serde(default)]
     pub hidden_file_patterns: Vec<String>,
     /// Rules for files whose changes are not recorded.
@@ -64,12 +64,12 @@ pub struct HistoryRecordRequest {
 /// tree and their existing history stays listed. Globs use the hidden-path
 /// syntax; regexes are case-insensitive and match anywhere in the
 /// workspace-relative path unless anchored. An invalid regex never matches.
-/// The built-in folders apply as `**/name/` globs unless a `!**/name/` (or
+/// The default ignored folders apply as `**/name/` globs unless a `!**/name/` (or
 /// `!name`) glob turns one off.
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryIgnoreRules {
-    /// Globs in hidden-path syntax; `!` lines turn built-in folders back on.
+    /// Globs in hidden-path syntax; `!` lines turn default folders back on.
     #[serde(default)]
     pub path_patterns: Vec<String>,
     /// Case-insensitive regexes matched against the workspace-relative path.
@@ -97,15 +97,15 @@ impl HistoryIgnoreRules {
             .filter(|name| {
                 !disabled.iter().any(|entry| {
                     entry.eq_ignore_ascii_case(name)
-                        || entry.eq_ignore_ascii_case(&built_in_ignore_pattern(name))
+                        || entry.eq_ignore_ascii_case(&default_ignore_pattern(name))
                 })
             })
             .collect()
     }
 }
 
-/// The wildcard rule settings show for a built-in ignored folder.
-fn built_in_ignore_pattern(name: &str) -> String {
+/// The wildcard rule settings show for a default ignored folder.
+fn default_ignore_pattern(name: &str) -> String {
     format!("**/{name}/")
 }
 
@@ -119,7 +119,7 @@ pub struct HistoryIgnorePreviewRequest {
     /// Rules being edited in settings.
     #[serde(default)]
     pub ignore_rules: HistoryIgnoreRules,
-    /// Hidden-path entries, so the preview honours built-ins the user turned off.
+    /// Hidden-path entries, so the preview honours defaults the user turned off.
     #[serde(default)]
     pub hidden_file_patterns: Vec<String>,
     /// Project root; when given, the preview also asks Git whether it ignores `path`.
@@ -143,7 +143,7 @@ pub struct HistoryIgnoreRegexError {
 pub enum HistoryIgnoreMatch {
     /// Hidden from the project tree, so never recorded.
     Hidden,
-    /// The wildcard rule as written, built-in or the user's own.
+    /// The wildcard rule as written, a default or the user's own.
     Pattern {
         /// The wildcard rule.
         pattern: String,
@@ -161,7 +161,9 @@ pub enum HistoryIgnoreMatch {
 pub struct HistoryIgnorePreviewResponse {
     /// Regexes that failed to compile.
     pub regex_errors: Vec<HistoryIgnoreRegexError>,
-    /// The built-in wildcard rules, for settings to show and edit against.
+    /// The default wildcard rules, for settings to show and edit against.
+    ///
+    /// The wire name `builtInIgnorePatterns` predates plugin-declared folders and stays for hosts.
     pub built_in_ignore_patterns: Vec<String>,
     /// Rule that keeps the sample path out of history; absent when it would be recorded.
     pub matched: Option<HistoryIgnoreMatch>,
@@ -202,10 +204,10 @@ pub struct HistoryEntriesRequest {
     /// Workspace-relative file to list; absent lists every visible file.
     #[serde(default)]
     pub path: Option<String>,
-    /// Extra directory names hidden from the tree, on top of the built-in ones.
+    /// Extra directory names hidden from the tree, on top of the default ones.
     #[serde(default)]
     pub hidden_directory_names: Vec<String>,
-    /// Hidden-path globs; `!` lines turn built-in hidden folders back on.
+    /// Hidden-path globs; `!` lines turn default hidden folders back on.
     #[serde(default)]
     pub hidden_file_patterns: Vec<String>,
 }
@@ -658,7 +660,7 @@ pub fn ignore_preview(
         regex_errors,
         built_in_ignore_patterns: lithe_core_rules::visibility::default_hidden_directories()
             .iter()
-            .map(|name| built_in_ignore_pattern(name))
+            .map(|name| default_ignore_pattern(name))
             .collect(),
         matched,
         git_ignored,
@@ -717,23 +719,23 @@ fn preview_match(
     ignored_rule(rules, relative_path)
 }
 
-/// The first rule that matches: built-in folders, the user's globs, then regexes.
+/// The first rule that matches: default folders, the user's globs, then regexes.
 fn ignored_rule(rules: &HistoryIgnoreRules, relative_path: &str) -> Option<HistoryIgnoreMatch> {
     // Folder names are compared directly; baseline seeding asks for thousands of files.
     let mut folders = relative_path.split('/').collect::<Vec<_>>();
     folders.pop();
-    let built_in = rules.default_ignored_directories();
+    let defaults = rules.default_ignored_directories();
     if let Some(name) = folders.iter().find_map(|folder| {
-        built_in
+        defaults
             .iter()
             .find(|name| folder.eq_ignore_ascii_case(name))
     }) {
         return Some(HistoryIgnoreMatch::Pattern {
-            pattern: built_in_ignore_pattern(name),
+            pattern: default_ignore_pattern(name),
         });
     }
     // Match only this history glob. Re-adding default hidden rules here would
-    // override the caller's disabled built-ins and misreport unrelated globs.
+    // override the caller's disabled defaults and misreport unrelated globs.
     let found = rules
         .path_patterns
         .iter()

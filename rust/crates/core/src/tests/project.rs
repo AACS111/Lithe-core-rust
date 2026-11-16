@@ -279,13 +279,17 @@ fn search_everywhere_matches_names_before_limits_and_shares_utf16_fragments() {
     // are covered by the `configure_visibility` integration test: the declarations are
     // process-wide, so these unit tests run with none.
     let search = |cap: usize| -> Vec<Value> {
-        let response: Value = serde_json::from_str(&execute_json(&serde_json::json!({
-            "command": "workspace.searchEverywhere", "payload": {
-                "root": root, "query": fixture["query"], "maxResults": 1000,
-                "maxFileResults": cap, "maxContentResults": 0, "maxSymbolResults": 0,
-                "includeGeneratedFileNames": true, "hiddenDirectoryNames": ["excluded"]
-            }
-        }).to_string())).unwrap();
+        let response: Value = serde_json::from_str(&execute_json(
+            &serde_json::json!({
+                "command": "workspace.searchEverywhere", "payload": {
+                    "root": root, "query": fixture["query"], "maxResults": 1000,
+                    "maxFileResults": cap, "maxContentResults": 0, "maxSymbolResults": 0,
+                    "includeGeneratedFileNames": true, "hiddenDirectoryNames": ["excluded"]
+                }
+            })
+            .to_string(),
+        ))
+        .unwrap();
         assert_eq!(response["ok"], true, "{response}");
         response["data"]["matches"].as_array().unwrap().clone()
     };
@@ -322,9 +326,14 @@ fn search_everywhere_matches_names_before_limits_and_shares_utf16_fragments() {
     assert_eq!(response["data"]["matches"].as_array().unwrap().len(), 2);
     // A cached name index must follow file updates, deletion and directory invalidation.
     let update = |paths: &[&str]| {
-        crate::project::files::update_search_index(serde_json::from_value(serde_json::json!({
-            "root": root, "paths": paths, "hiddenDirectoryNames": ["excluded"]
-        })).unwrap(), lithe_lsp_engine::indexing_changed).unwrap()
+        crate::project::files::update_search_index(
+            serde_json::from_value(serde_json::json!({
+                "root": root, "paths": paths, "hiddenDirectoryNames": ["excluded"]
+            }))
+            .unwrap(),
+            lithe_lsp_engine::indexing_changed,
+        )
+        .unwrap()
     };
     fs::write(root.join(".build/checkouts/NameGuide.swift"), "").unwrap();
     update(&[".build/checkouts/NameGuide.swift"]);
@@ -771,7 +780,10 @@ fn workspace_snapshot_skips_hidden_folders_and_files_at_any_depth() {
             }))
             .unwrap()
         ),
-        vec![".worktree/bin/activate".to_string(), "app/main.py".to_string()]
+        vec![
+            ".worktree/bin/activate".to_string(),
+            "app/main.py".to_string()
+        ]
     );
     fs::remove_dir_all(root).expect("temporary fixture should be removable");
 }

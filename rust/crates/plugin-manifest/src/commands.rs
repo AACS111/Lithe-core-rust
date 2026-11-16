@@ -242,9 +242,7 @@ pub struct DeclaredHiddenDirectories {
 /// Decodes a `workspace.configureVisibility` payload and collects the folder
 /// names of every manifest that validates. As in `build.detect`, an invalid
 /// manifest is reported instead of failing the call.
-pub fn declared_hidden_directories(
-    payload: Value,
-) -> Result<DeclaredHiddenDirectories, CoreError> {
+pub fn declared_hidden_directories(payload: Value) -> Result<DeclaredHiddenDirectories, CoreError> {
     let payload: VisibilityPayload = decode_payload(payload, "workspace.configureVisibility")?;
     let mut generated = Vec::new();
     let mut metadata = Vec::new();

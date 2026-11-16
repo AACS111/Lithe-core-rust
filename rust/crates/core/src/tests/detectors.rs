@@ -131,7 +131,9 @@ fn detectors_never_descend_into_hidden_folders() {
         .collect::<Vec<_>>();
 
     assert!(
-        !sources.iter().any(|source| source.contains(".worktrees/decoy")),
+        !sources
+            .iter()
+            .any(|source| source.contains(".worktrees/decoy")),
         "{sources:?}"
     );
     assert!(

@@ -34,7 +34,10 @@ fn configure(plugins: Vec<Value>) -> Value {
         .into_iter()
         .map(|manifest| json!({ "manifest": manifest }))
         .collect();
-    data("workspace.configureVisibility", json!({ "plugins": plugins }))
+    data(
+        "workspace.configureVisibility",
+        json!({ "plugins": plugins }),
+    )
 }
 
 /// Clears the declarations when the test ends, also after a failed assertion.
@@ -147,7 +150,12 @@ fn file_names(root: &Path, include_generated: bool) -> Vec<String> {
         .as_array()
         .expect("search should list matches")
         .iter()
-        .map(|item| item["path"].as_str().expect("path should be text").to_string())
+        .map(|item| {
+            item["path"]
+                .as_str()
+                .expect("path should be text")
+                .to_string()
+        })
         .collect();
     paths.sort();
     paths.dedup();
@@ -166,7 +174,12 @@ fn content_matches(root: &Path) -> Vec<String> {
         .as_array()
         .expect("search should list matches")
         .iter()
-        .map(|item| item["path"].as_str().expect("path should be text").to_string())
+        .map(|item| {
+            item["path"]
+                .as_str()
+                .expect("path should be text")
+                .to_string()
+        })
         .collect();
     paths.sort();
     paths.dedup();
@@ -226,13 +239,18 @@ fn vcs_roots(root: &Path) -> Vec<String> {
 }
 
 fn repositories(root: &Path) -> Vec<String> {
-    let mut paths: Vec<String> =
-        data("workspace.repositories", json!({ "root": root }))["repositories"]
-            .as_array()
-            .expect("discovery should list repositories")
-            .iter()
-            .map(|entry| entry["path"].as_str().expect("path should be text").to_string())
-            .collect();
+    let mut paths: Vec<String> = data("workspace.repositories", json!({ "root": root }))
+        ["repositories"]
+        .as_array()
+        .expect("discovery should list repositories")
+        .iter()
+        .map(|entry| {
+            entry["path"]
+                .as_str()
+                .expect("path should be text")
+                .to_string()
+        })
+        .collect();
     paths.sort();
     paths
 }
@@ -247,7 +265,10 @@ fn plugin_declared_folders_are_hidden_by_every_walk_until_cleared() {
         .write("src/Report.txt", "report body\n")
         .write("target/Makefile", "all:\n\ttrue\n")
         .write("target/debug/Report.txt", "report body\n")
-        .write("target/debug/Cargo.toml", "[package]\nname = \"generated\"\n")
+        .write(
+            "target/debug/Cargo.toml",
+            "[package]\nname = \"generated\"\n",
+        )
         // Declared names match one path component, ignoring ASCII case.
         .write("module/generated/Report.txt", "report body\n")
         .write("legacy/.svn/Report.txt", "report body\n")
@@ -291,7 +312,14 @@ fn plugin_declared_folders_are_hidden_by_every_walk_until_cleared() {
     // Hosts read the folders to display them and classify paths without a copy.
     let defaults = data("workspace.visibilityDefaults", json!({}));
     let names = strings(&defaults["hiddenDirectoryNames"]);
-    for name in [".git", ".worktree", ".worktrees", ".svn", "Generated", "target"] {
+    for name in [
+        ".git",
+        ".worktree",
+        ".worktrees",
+        ".svn",
+        "Generated",
+        "target",
+    ] {
         assert!(names.iter().any(|entry| entry == name), "{name}: {names:?}");
     }
     let classified = data(
@@ -361,7 +389,9 @@ fn plugin_declared_folders_are_hidden_by_every_walk_until_cleared() {
     assert!(!lithe_core::is_workspace_event_relevant(
         "target/debug/Report.txt"
     ));
-    assert!(!lithe_core::is_workspace_event_relevant("legacy/.svn/wc.db"));
+    assert!(!lithe_core::is_workspace_event_relevant(
+        "legacy/.svn/wc.db"
+    ));
     assert!(lithe_core::is_workspace_event_relevant("src/Report.txt"));
 
     // Run discovery, build detection, VCS roots and Git repositories skip them too.
@@ -372,7 +402,10 @@ fn plugin_declared_folders_are_hidden_by_every_walk_until_cleared() {
 
     // An empty list clears the declarations, and every walk sees the folders again.
     let cleared = configure(Vec::new());
-    assert_eq!(cleared, json!({ "hiddenDirectoryNames": [], "rejected": [] }));
+    assert_eq!(
+        cleared,
+        json!({ "hiddenDirectoryNames": [], "rejected": [] })
+    );
     assert_eq!(file_names(&root, false), everything);
     assert_eq!(vcs_roots(&root), ["legacy", "target/checkout"]);
 
