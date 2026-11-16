@@ -2,6 +2,8 @@
 
 use crate::workspace_scope::WorkspaceScope;
 use lithe_document_uri::{native_path, DocumentPathPlatform, MAX_PATH_BYTES};
+use lithe_platform::paths::{is_separator, slash_separated};
+use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -69,7 +71,7 @@ pub fn resolve_command(payload: Value) -> Result<Value, CoreError> {
         return Ok(missing());
     };
     if windows {
-        path = path.replace('\\', "/");
+        path = slash_separated(&path, Platform::Windows).into_owned();
         let bytes = path.as_bytes();
         let drive = bytes.len() >= 3
             && bytes[0].is_ascii_alphabetic()
@@ -81,7 +83,9 @@ pub fn resolve_command(payload: Value) -> Result<Value, CoreError> {
             }
             path = format!(
                 "{}/{}",
-                request.workspace_root.trim_end_matches(['/', '\\']),
+                request
+                    .workspace_root
+                    .trim_end_matches(|character| is_separator(character, Platform::Windows)),
                 path
             );
         }

@@ -10,5 +10,5 @@ mod error;
 pub mod json_document;
 mod response;
 
-pub use error::{invalid_relative_path, CoreError, ErrorCode};
+pub use error::{CoreError, ErrorCode};
 pub use response::{CoreResponse, ResponseData};

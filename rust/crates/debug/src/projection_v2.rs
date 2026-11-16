@@ -4,6 +4,8 @@
 //! Version 1 stays authoritative until every consumer migrates. The engine emits v2
 //! beside it, built here from the raw adapter body so no v1 narrowing leaks into v2.
 
+use lithe_platform::paths::slash_separated;
+use lithe_platform::Platform;
 #[cfg(test)]
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
@@ -456,13 +458,12 @@ fn finish(projection: SessionProjection) -> Option<SessionProjection> {
 fn workspace_relative(path: &str, root: &str) -> Option<String> {
     let is_windows =
         root.as_bytes().get(1) == Some(&b':') && root.as_bytes()[0].is_ascii_alphabetic();
-    let normalize = |text: &str| {
-        if is_windows {
-            text.replace('\\', "/")
-        } else {
-            text.to_string()
-        }
+    let platform = if is_windows {
+        Platform::Windows
+    } else {
+        Platform::Unix
     };
+    let normalize = |text: &str| slash_separated(text, platform).into_owned();
     let (path, root) = (normalize(path), normalize(root));
     let root = root.trim_end_matches('/');
     let rest = if is_windows && path.len() >= root.len() && path.is_char_boundary(root.len()) {

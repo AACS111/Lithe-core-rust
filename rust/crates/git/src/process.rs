@@ -2,6 +2,8 @@
 //! invocation trace and the generic `git.command` entry points.
 
 use super::*;
+use lithe_platform::paths::slash_separated_path;
+use lithe_platform::Platform;
 
 /// Raw Git process streams kept separate for machine-readable consumers.
 pub(crate) struct GitProcessOutput {
@@ -131,7 +133,7 @@ pub fn discover_repository_root(
 ) -> Result<Option<String>, CoreError> {
     let root = validate_root(&request.root)?;
     Ok(discover_containing_repository(Path::new(&root))?
-        .map(|path| path.to_string_lossy().replace('\\', "/")))
+        .map(|path| slash_separated_path(&path, Platform::HOST)))
 }
 
 /// Runs one Git invocation the user sees in the console, under the request's

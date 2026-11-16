@@ -1117,6 +1117,49 @@ fn git_write_appends_shared_and_local_ignore_patterns_without_duplicates() {
     fs::remove_dir_all(root).expect("temporary workspace should be removable");
 }
 
+/// A Unix file name may hold a backslash. The pattern must ignore that one file
+/// rather than read the backslash as a separator or let Git read it as an escape.
+#[cfg(unix)]
+#[test]
+fn git_write_ignores_a_unix_file_whose_name_holds_a_backslash() {
+    let root = temporary_root("git-write-ignore-backslash");
+    fs::create_dir_all(root.join("logs")).expect("temporary repository should be creatable");
+    let run = |arguments: &[&str]| {
+        Command::new("git")
+            .args(arguments)
+            .current_dir(&root)
+            .output()
+            .expect("git should be available")
+    };
+    assert!(run(&["init", "-q"]).status.success());
+    fs::write(root.join("logs\\app.log"), "ignored\n").expect("log file should be writable");
+    fs::write(root.join("logs/app.log"), "kept\n").expect("nested file should be writable");
+
+    let response: Value = serde_json::from_str(&execute_json(
+        &serde_json::to_string(&serde_json::json!({
+            "id": "ignore",
+            "command": "git.write",
+            "payload": {"root": root, "operation": "ignore", "paths": ["logs\\app.log"]}
+        }))
+        .expect("ignore request should encode"),
+    ))
+    .expect("ignore response should be JSON");
+    assert_eq!(response["ok"], true, "{response:?}");
+
+    assert_eq!(
+        fs::read_to_string(root.join(".gitignore")).expect("gitignore should be readable"),
+        "/logs\\\\app.log\n"
+    );
+    assert!(run(&["check-ignore", "-q", "logs\\app.log"])
+        .status
+        .success());
+    assert!(!run(&["check-ignore", "-q", "logs/app.log"])
+        .status
+        .success());
+
+    fs::remove_dir_all(root).expect("temporary workspace should be removable");
+}
+
 #[test]
 fn git_write_edits_a_local_commit_message_and_rebuilds_descendants() {
     let root = history_rewrite_repository("git-edit-commit-message");

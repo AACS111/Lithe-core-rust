@@ -26,6 +26,9 @@ pub enum Platform {
 }
 
 impl Platform {
+    /// Every platform, for rules that must hold on each of them.
+    pub const ALL: [Self; 2] = [Self::Unix, Self::Windows];
+
     /// The platform this binary was compiled for.
     pub const HOST: Self = if cfg!(windows) {
         Self::Windows

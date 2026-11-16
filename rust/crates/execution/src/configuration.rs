@@ -5,7 +5,11 @@ pub use project_toolchain::{project_toolchain, ProjectToolchainRequest};
 
 use super::generated_layer::{self, GeneratedLayer};
 use super::types::{Confidence, Execution, RunCategory};
-use lithe_protocol::{invalid_relative_path, CoreError, ErrorCode};
+use lithe_platform::paths::{
+    invalid_native_relative_path, invalid_portable_relative_path, slash_separated_path,
+};
+use lithe_platform::Platform;
+use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};

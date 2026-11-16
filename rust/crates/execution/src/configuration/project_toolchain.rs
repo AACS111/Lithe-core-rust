@@ -4,7 +4,8 @@
 //! It never inspects a build file or runs a tool.
 
 use super::{existing_root, local_layer_document, read_local_toolchains, validate_version_value};
-use lithe_protocol::{invalid_relative_path, CoreError, ErrorCode};
+use lithe_platform::paths::invalid_portable_relative_path;
+use lithe_protocol::{CoreError, ErrorCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -29,8 +30,7 @@ pub struct ProjectToolchainRequest {
 /// Returns saved paths, never resolved executables.
 pub fn project_toolchain(request: ProjectToolchainRequest) -> Result<Value, CoreError> {
     if request.path.len() > 1024
-        || invalid_relative_path(&request.path)
-        || request.path.contains('\\')
+        || invalid_portable_relative_path(&request.path)
         || request.path.chars().any(char::is_control)
         || request.path != "."
             && request

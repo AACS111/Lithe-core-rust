@@ -52,7 +52,7 @@ pub(crate) fn normalize_working_directory(root: &Path, value: &str) -> Result<St
 
 pub(crate) fn normalize_project_directory(root: &Path, value: &str) -> Result<String, CoreError> {
     let candidate = Path::new(value);
-    if (!candidate.is_absolute() && invalid_relative_path(value))
+    if (!candidate.is_absolute() && invalid_native_relative_path(value, Platform::HOST))
         || candidate
             .components()
             .any(|component| matches!(component, std::path::Component::ParentDir))
@@ -86,12 +86,12 @@ pub(crate) fn normalize_project_directory(root: &Path, value: &str) -> Result<St
     if relative.as_os_str().is_empty() {
         Ok(".".to_string())
     } else {
-        Ok(relative.to_string_lossy().replace('\\', "/"))
+        Ok(slash_separated_path(relative, Platform::HOST))
     }
 }
 
 pub(crate) fn project_directory_exists(root: &Path, value: &str) -> bool {
-    if invalid_relative_path(value) {
+    if invalid_native_relative_path(value, Platform::HOST) {
         return false;
     }
     let Ok(canonical_root) = fs::canonicalize(root) else {

@@ -5478,9 +5478,11 @@ by `rust/fixtures/workspace/directory-rules-v1.json`.
 
 `workspace.planDuplicate` takes `{ name, isDirectory, existing?, caseInsensitive? }` and returns
 `{ name }`; `workspace.planPaste` takes `{ items: [{ name, isDirectory }], existing?, caseInsensitive? }`
-and returns `{ names }`. A file name is split at its last dot, a directory name and a leading-dot name
-are not. Core never touches the file system: the host passes the names it has seen to exist, creates the
-copy without replacing anything (`FileManager.copyItem`, which refuses an existing destination, on macOS;
+and returns `{ names }`. Every name must be one file name on the host: an empty name, `.`, `..` and a
+name containing `/` are rejected everywhere, and on Windows a name containing `\` or `:` is too, while
+on Unix those are ordinary characters. A file name is split at its last dot, a directory name and a
+leading-dot name are not. Core never touches the file system: the host passes the names it has seen
+to exist, creates the copy without replacing anything (`FileManager.copyItem`, which refuses an existing destination, on macOS;
 `create_new` and `MoveFileEx` without replacement on Windows) and, when that fails because the name
 appeared meanwhile, adds the name to `existing` and plans again. After 512 rounds the host reports
 the stable `destination_exists` error. Cases are in `rust/fixtures/workspace/file-copy-names-v1.json`.

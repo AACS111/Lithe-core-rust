@@ -1,6 +1,8 @@
 //! Bounded workspace traversal shared by all run-configuration detectors.
 
 use crate::workspace_scan::{scan_run_workspace_ignoring, IgnoredPaths};
+use lithe_platform::paths::slash_separated_path;
+use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use lithe_workspace::fs;
 use std::collections::BTreeSet;
@@ -109,7 +111,7 @@ fn relative_path(root: &Path, directory: &Path) -> Result<String, CoreError> {
             "Scanned directory escaped the project root",
         )
     })?;
-    let value = relative.to_string_lossy().replace('\\', "/");
+    let value = slash_separated_path(relative, Platform::HOST);
     Ok(if value.is_empty() {
         ".".to_string()
     } else {

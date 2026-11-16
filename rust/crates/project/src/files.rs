@@ -9,7 +9,11 @@ use crate::contracts::{
     WorkspaceSnapshotResponse,
 };
 use lithe_core_rules::file_names::FileNameKey;
-use lithe_protocol::{invalid_relative_path, CoreError, ErrorCode};
+use lithe_platform::paths::{
+    invalid_relative_path, is_separator, slash_separated, slash_separated_path,
+};
+use lithe_platform::Platform;
+use lithe_protocol::{CoreError, ErrorCode};
 use lithe_workspace::fs;
 use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};

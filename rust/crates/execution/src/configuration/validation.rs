@@ -89,7 +89,7 @@ pub(crate) fn validate_configuration(configuration: &RunConfiguration) -> Result
             ));
         }
     }
-    if invalid_relative_path(&configuration.cwd) {
+    if invalid_native_relative_path(&configuration.cwd, Platform::HOST) {
         return Err(CoreError::new(
             ErrorCode::InvalidRequest,
             "Run configuration contains an invalid project-relative path",
@@ -97,11 +97,6 @@ pub(crate) fn validate_configuration(configuration: &RunConfiguration) -> Result
         .with_details(format!("workingDirectory: {}", configuration.cwd)));
     }
     Ok(())
-}
-
-#[allow(dead_code)]
-fn valid_relative(value: &str) -> bool {
-    !invalid_relative_path(value)
 }
 
 /// `namespace.name`, both segments lowercase kebab starting with a letter.

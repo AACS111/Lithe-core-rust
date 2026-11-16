@@ -13,11 +13,13 @@ pub fn is_workspace_event_relevant(relative: &str) -> bool {
 /// off with a `!` hidden-path entry is visible, so its events are kept.
 fn is_workspace_event_relevant_with(relative: &str, hidden_file_patterns: &[String]) -> bool {
     let disabled = disabled_built_ins(hidden_file_patterns);
-    !relative.split(['/', '\\']).any(|component| {
-        BUILT_IN_HIDDEN_DIRECTORIES.iter().any(|name| {
-            component.eq_ignore_ascii_case(name) && !is_disabled_directory(name, &disabled)
+    !relative
+        .split(|character| is_separator(character, Platform::HOST))
+        .any(|component| {
+            BUILT_IN_HIDDEN_DIRECTORIES.iter().any(|name| {
+                component.eq_ignore_ascii_case(name) && !is_disabled_directory(name, &disabled)
+            })
         })
-    })
 }
 
 /// Changed paths for `workspace.filterChanges`: a bare path list, or the
