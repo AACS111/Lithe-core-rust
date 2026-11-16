@@ -132,24 +132,6 @@ pub fn default_hidden_directories() -> Vec<String> {
     )
 }
 
-/// Whether `name` is one of the folder names hidden by default. Walks that see thousands of
-/// folders should take [`default_hidden_directories`] once instead.
-pub fn is_default_hidden_directory_name(name: &str) -> bool {
-    BUILT_IN_HIDDEN_DIRECTORIES
-        .iter()
-        .any(|hidden| hidden.eq_ignore_ascii_case(name))
-        || {
-            let directories = PLUGIN_HIDDEN_DIRECTORIES
-                .read()
-                .unwrap_or_else(PoisonError::into_inner);
-            directories
-                .generated
-                .iter()
-                .chain(&directories.metadata)
-                .any(|hidden| hidden.eq_ignore_ascii_case(name))
-        }
-}
-
 /// The project configuration folder is hidden like IDEA's `.idea`; its files are edited through
 /// Settings and the run configuration editor.
 pub const CONFIGURATION_PATTERN: &str = ".lithe/**";
