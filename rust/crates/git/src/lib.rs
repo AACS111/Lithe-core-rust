@@ -22,6 +22,7 @@ pub mod contracts;
 mod deleted_selection;
 mod diff_blocks;
 pub mod workspace_commit;
+pub mod workspace_push;
 mod workspace_repositories;
 pub mod workspace_status;
 pub use commit_state::{inspect as commit_state, GitCommitGitlink, GitCommitState};

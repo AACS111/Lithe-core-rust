@@ -869,6 +869,8 @@ pub enum GitCommand {
     WorktreeCreationPreview,
     /// Resolves the destination and commits for a branch push (`git.pushPreview`).
     PushPreview,
+    /// Reviews pushing every workspace repository, in push order (`git.workspacePushPreview`).
+    WorkspacePushPreview,
     /// Resolves metadata for one commit (`git.commit`).
     Commit,
     /// Lists paths changed by one commit (`git.commitFiles`).
@@ -1484,6 +1486,7 @@ impl CoreCommand {
             "git.changedFileGroups" => Some(Self::Git(GitCommand::ChangedFileGroups)),
             "git.worktreeCreationPreview" => Some(Self::Git(GitCommand::WorktreeCreationPreview)),
             "git.pushPreview" => Some(Self::Git(GitCommand::PushPreview)),
+            "git.workspacePushPreview" => Some(Self::Git(GitCommand::WorkspacePushPreview)),
             "git.commit" => Some(Self::Git(GitCommand::Commit)),
             "git.commitFiles" => Some(Self::Git(GitCommand::CommitFiles)),
             "git.comparison" => Some(Self::Git(GitCommand::Comparison)),
@@ -1751,6 +1754,10 @@ mod tests {
         assert!(matches!(
             CoreCommand::parse("git.pushPreview"),
             Some(CoreCommand::Git(GitCommand::PushPreview))
+        ));
+        assert!(matches!(
+            CoreCommand::parse("git.workspacePushPreview"),
+            Some(CoreCommand::Git(GitCommand::WorkspacePushPreview))
         ));
     }
 
