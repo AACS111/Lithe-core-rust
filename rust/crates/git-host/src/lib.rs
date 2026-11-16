@@ -426,10 +426,15 @@ mod platform {
                 return Ok(());
             }
             let error = io::Error::last_os_error();
-            if error.raw_os_error() == Some(libc::ESRCH) {
-                return Ok(());
+            match error.raw_os_error() {
+                Some(libc::ESRCH) => Ok(()),
+                // No member accepted the signal: on macOS every member is a
+                // zombie its parent has not reaped yet, or a member belongs
+                // to another user. Nothing more can be sent either way, and
+                // `ProcessTree::terminate` waits until the members are gone.
+                Some(libc::EPERM) => Ok(()),
+                _ => Err(error),
             }
-            Err(error)
         }
         pub fn has_live_processes(&self) -> io::Result<bool> {
             // SAFETY: signal 0 only checks whether the group still has members.
@@ -439,7 +444,8 @@ mod platform {
             let error = io::Error::last_os_error();
             match error.raw_os_error() {
                 Some(libc::ESRCH) => Ok(false),
-                // A member exists but belongs to another user, so it is alive.
+                // A member exists that refuses signals: an unreaped zombie on
+                // macOS or another user's process. It counts until it is gone.
                 Some(libc::EPERM) => Ok(true),
                 _ => Err(error),
             }

@@ -1,20 +1,25 @@
 //! Lexical native-path policy independent of the machine running Core.
 
+use lithe_platform::paths::{is_separator, slash_separated};
+use lithe_platform::Platform;
+
+/// Separator rules for a host platform name (`windows`, `macos`, `linux`).
+pub fn rules(platform: &str) -> Platform {
+    if platform == "windows" {
+        Platform::Windows
+    } else {
+        Platform::Unix
+    }
+}
+
 /// Normalizes a bounded absolute path using the target platform's separators.
 /// Native adapters must supply canonical filesystem facts separately.
 pub fn normalize(path: &str, platform: &str, case_sensitive: bool) -> Option<String> {
     if path.is_empty() || path.len() > 4096 || path.chars().any(char::is_control) {
         return None;
     }
-    let windows = platform == "windows";
-    let text = if windows {
-        path.replace('\\', "/")
-    } else {
-        if path.contains('\\') {
-            return None;
-        }
-        path.to_owned()
-    };
+    let windows = rules(platform).is_windows();
+    let text = slash_separated(path, rules(platform)).into_owned();
     let (prefix, remainder) = if windows {
         let bytes = text.as_bytes();
         if bytes.len() >= 3
@@ -90,8 +95,33 @@ pub fn join(home: &str, relative: &str, platform: &str) -> Option<String> {
         return None;
     }
     normalize(
-        &format!("{}/{relative}", home.trim_end_matches(['/', '\\'])),
+        &format!(
+            "{}/{relative}",
+            home.trim_end_matches(|character| is_separator(character, rules(platform)))
+        ),
         platform,
         true,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize;
+
+    #[test]
+    fn only_windows_reads_a_backslash_as_a_separator() {
+        assert_eq!(
+            normalize(r"C:\Tools\jdk", "windows", true).as_deref(),
+            Some("C:/Tools/jdk")
+        );
+        assert_eq!(
+            normalize(r"/opt/a\b/jdk", "linux", true).as_deref(),
+            Some(r"/opt/a\b/jdk")
+        );
+        assert_eq!(
+            normalize(r"/opt/a\b/jdk", "macos", true).as_deref(),
+            Some(r"/opt/a\b/jdk")
+        );
+        assert_eq!(normalize(r"\opt\jdk", "linux", true), None);
+    }
 }

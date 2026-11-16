@@ -12,6 +12,8 @@
 //! reports that the name now exists, add that name to `existing` and plan again. Core
 //! never touches the file system.
 
+use lithe_platform::paths::invalid_relative_path;
+use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -72,6 +74,7 @@ pub fn plan_duplicate_command(payload: Value) -> Result<Value, CoreError> {
         &request.existing,
         request.case_insensitive,
         true,
+        Platform::HOST,
     )?;
     Ok(json!({ "name": names[0] }))
 }
@@ -94,6 +97,7 @@ pub fn plan_paste_command(payload: Value) -> Result<Value, CoreError> {
         &request.existing,
         request.case_insensitive,
         false,
+        Platform::HOST,
     )?;
     Ok(json!({ "names": names }))
 }
@@ -108,6 +112,7 @@ fn plan(
     existing: &[String],
     case_insensitive: bool,
     always_suffix: bool,
+    platform: Platform,
 ) -> Result<Vec<String>, CoreError> {
     if existing.len() > MAX_EXISTING_NAMES {
         return Err(CoreError::new(
@@ -125,7 +130,7 @@ fn plan(
     let mut taken: HashSet<String> = existing.iter().map(|name| key(name)).collect();
     let mut planned = Vec::with_capacity(items.len());
     for item in items {
-        validate_name(&item.name)?;
+        validate_name(&item.name, platform)?;
         let (stem, extension) = split_name(&item.name, item.is_directory);
         let chosen = std::iter::once(0usize)
             .filter(|_| !always_suffix)
@@ -143,12 +148,14 @@ fn plan(
     Ok(planned)
 }
 
-fn validate_name(name: &str) -> Result<(), CoreError> {
-    if name.is_empty()
-        || name == "."
-        || name == ".."
+/// Rejects `name` unless `platform` reads it as one file name. On Unix `\` and
+/// `:` are ordinary characters, so `D:\logs` is a name there but not on Windows.
+fn validate_name(name: &str, platform: Platform) -> Result<(), CoreError> {
+    // One component of a valid relative path is a single file name.
+    if name == "."
         || name.len() > MAX_NAME_BYTES
-        || name.contains(['/', '\\', '\0'])
+        || name.contains('/')
+        || invalid_relative_path(name, platform)
     {
         return Err(CoreError::new(
             ErrorCode::InvalidRequest,
@@ -166,5 +173,37 @@ fn split_name(name: &str, is_directory: bool) -> (&str, &str) {
     match name.rfind('.') {
         Some(dot) if dot > 0 && dot + 1 < name.len() => name.split_at(dot),
         _ => (name, ""),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_name;
+    use lithe_platform::Platform;
+    use serde_json::Value;
+
+    fn names(key: &str) -> Vec<String> {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../fixtures/workspace/file-copy-names-v1.json"
+        ))
+        .expect("file copy names fixture should be JSON");
+        serde_json::from_value(fixture[key].clone()).expect("fixture names should be strings")
+    }
+
+    #[test]
+    fn invalid_names_are_rejected_on_every_platform() {
+        for name in names("invalidNames") {
+            for platform in Platform::ALL {
+                assert!(validate_name(&name, platform).is_err(), "{name:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn only_windows_rejects_names_with_a_backslash_or_a_colon() {
+        for name in names("windowsInvalidNames") {
+            assert!(validate_name(&name, Platform::Windows).is_err(), "{name:?}");
+            assert!(validate_name(&name, Platform::Unix).is_ok(), "{name:?}");
+        }
     }
 }

@@ -168,10 +168,10 @@ mod tests {
             Self(root)
         }
         fn root(&self, name: &str) -> String {
-            super::super::canonicalize_simplified(&self.0.join(name))
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/")
+            lithe_platform::paths::slash_separated_path(
+                &super::super::canonicalize_simplified(&self.0.join(name)).unwrap(),
+                Platform::HOST,
+            )
         }
         fn resolve(&self, root: &str, path: &str) -> Option<Context> {
             resolve(Request {

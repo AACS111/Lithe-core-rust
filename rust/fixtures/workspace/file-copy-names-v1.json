@@ -21,5 +21,6 @@
     {"id": "case-insensitive-paste", "request": {"items": [{"name": "Readme.MD", "isDirectory": false}], "existing": ["readme.md"], "caseInsensitive": true}, "names": ["Readme copy.MD"]},
     {"id": "directory-paste", "request": {"items": [{"name": "src.v2", "isDirectory": true}], "existing": ["src.v2", "src.v2 copy"]}, "names": ["src.v2 copy 2"]}
   ],
-  "invalidNames": ["", ".", "..", "a/b", "a\\b"]
+  "invalidNames": ["", ".", "..", "a/b"],
+  "windowsInvalidNames": ["a\\b", "D:\\logs", "a:b"]
 }

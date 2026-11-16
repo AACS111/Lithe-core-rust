@@ -3,6 +3,7 @@
 
 use super::*;
 use lithe_platform::names::is_reserved_device_name;
+use lithe_platform::paths::{slash_separated, slash_separated_path};
 use lithe_platform::Platform;
 
 /// Discovers Git repositories for an opened workspace using shared traversal rules.
@@ -89,7 +90,7 @@ pub fn workspace_repositories(
         repositories: repositories
             .into_iter()
             .map(|path| WorkspaceRepositoryResponse {
-                path: path.to_string_lossy().replace('\\', "/"),
+                path: slash_separated_path(&path, Platform::HOST),
             })
             .collect(),
     })
@@ -118,7 +119,9 @@ pub(crate) fn validate_windows_git_path(path: &Path) -> std::io::Result<()> {
 /// [`validate_windows_git_path`] for a repository that `platform` opens. A
 /// drive or UNC path is checked on every platform.
 fn validate_git_path_on(path: &Path, platform: Platform) -> std::io::Result<()> {
-    let text = path.to_string_lossy().replace('\\', "/");
+    // Read the text the way Windows would: a drive or UNC shape matters even
+    // when this host is not Windows.
+    let text = slash_separated(&path.to_string_lossy(), Platform::Windows).into_owned();
     let windows_path = platform.is_windows()
         || text.starts_with("//")
         || (text.as_bytes().get(1) == Some(&b':') && text.as_bytes()[0].is_ascii_alphabetic());
@@ -176,7 +179,7 @@ fn validate_git_path_on(path: &Path, platform: Platform) -> std::io::Result<()> 
 pub fn simplified_canonical_path(path: PathBuf) -> std::io::Result<PathBuf> {
     validate_windows_git_path(&path)?;
     let text = path.to_string_lossy();
-    let normalized = text.replace('\\', "/");
+    let normalized = slash_separated(&text, Platform::Windows);
     if normalized
         .get(..8)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case("//?/UNC/"))
@@ -310,7 +313,7 @@ fn sort_workspace_repository_paths(paths: &mut [PathBuf], workspace_root: &Path)
 }
 
 fn path_sort_key(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/").to_lowercase()
+    slash_separated_path(path, Platform::HOST).to_lowercase()
 }
 
 pub(crate) fn validate_paths(paths: &[String]) -> Result<Vec<String>, CoreError> {
@@ -394,7 +397,7 @@ pub(crate) fn empty_tree_oid(root: &str) -> Result<String, CoreError> {
 }
 
 pub(crate) fn is_safe_pathspec(path: &str) -> bool {
-    let normalized = path.replace('\\', "/");
+    let normalized = slash_separated(path, Platform::HOST);
     !normalized.is_empty()
         && !normalized.starts_with('/')
         && !normalized.split('/').any(|component| component == "..")
@@ -408,14 +411,14 @@ pub(crate) fn null_device() -> &'static str {
 pub(crate) fn relative_or_absolute(path: &Path, root: &Path) -> String {
     path.strip_prefix(root)
         .map(|relative| {
-            let value = relative.to_string_lossy().replace('\\', "/");
+            let value = slash_separated_path(relative, Platform::HOST);
             if value.is_empty() {
                 ".".to_string()
             } else {
                 value
             }
         })
-        .unwrap_or_else(|_| path.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| slash_separated_path(path, Platform::HOST))
 }
 
 #[cfg(test)]

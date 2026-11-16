@@ -67,10 +67,7 @@ impl BuildProviderRunReference {
                 .user_arguments
                 .iter()
                 .any(|arg| arg.len() > 4096 || arg.contains('\0'))
-            || invalid_relative_path(&self.root)
-            || self.root.is_empty()
-            || self.root.contains('\\')
-            || self.root.contains('\0')
+            || invalid_portable_relative_path(&self.root)
         {
             return Err(CoreError::new(
                 ErrorCode::InvalidRequest,

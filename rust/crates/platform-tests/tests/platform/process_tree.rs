@@ -151,6 +151,63 @@ fn a_unix_tree_ends_only_once_its_root_is_reaped() {
         .expect("a reaped root no longer counts");
 }
 
+/// A group whose members have all exited but are not reaped yet is a normal
+/// moment while a tree ends: the runtime a language server started can still
+/// wait for its new parent to reap it after the root is gone. macOS refuses to
+/// signal such a group (`EPERM`), and ending the tree must not report that as
+/// a failure.
+#[cfg(unix)]
+#[test]
+fn a_unix_tree_of_exited_unreaped_processes_ends_without_error() {
+    let Tree {
+        tree,
+        root,
+        output: _output,
+        _input,
+    } = spawn_tree(Mode::Hold);
+
+    tree.kill().expect("a running tree is killed");
+    wait_until_exited_unreaped(root.id());
+    tree.kill()
+        .expect("a tree whose processes all exited is killed again without error");
+
+    let root_exit = reap_in_background(root);
+    tree.terminate(DEADLINE)
+        .expect("the tree ends once its exited root is reaped");
+    let status = root_exit.recv_timeout(DEADLINE).expect("root reaped");
+    assert!(!status.success());
+}
+
+/// Waits until the child `process_id` has exited and leaves it unreaped, so it
+/// stays a zombie member of its process group until its `Child` is waited on.
+#[cfg(unix)]
+fn wait_until_exited_unreaped(process_id: u32) {
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || loop {
+        // SAFETY: `info` is a valid out-parameter, and `WNOWAIT` leaves the
+        // child for its `Child` owner to reap.
+        let result = unsafe {
+            let mut info: libc::siginfo_t = std::mem::zeroed();
+            libc::waitid(
+                libc::P_PID,
+                process_id as libc::id_t,
+                &mut info,
+                libc::WEXITED | libc::WNOWAIT,
+            )
+        };
+        let error = std::io::Error::last_os_error();
+        if result != 0 && error.kind() == std::io::ErrorKind::Interrupted {
+            continue;
+        }
+        let _ = sender.send(if result == 0 { Ok(()) } else { Err(error) });
+        break;
+    });
+    receiver
+        .recv_timeout(DEADLINE)
+        .expect("the killed root exits")
+        .expect("wait for the root without reaping it");
+}
+
 #[cfg(windows)]
 #[test]
 fn dropping_a_process_tree_ends_it_like_a_crashed_host() {

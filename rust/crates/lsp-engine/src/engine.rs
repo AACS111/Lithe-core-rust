@@ -376,7 +376,8 @@ fn canonical_workspace_path(root_uri: &str) -> Option<PathBuf> {
 
 pub(crate) fn canonical_workspace_root(root_uri: &str) -> Option<String> {
     let canonical = canonical_workspace_path(root_uri)?;
-    let canonical = canonical.to_string_lossy().replace('\\', "/");
+    let canonical =
+        lithe_platform::paths::slash_separated_path(&canonical, lithe_platform::Platform::HOST);
     // Windows canonical paths carry a verbatim `\\?\` prefix that language servers never report.
     Some(
         canonical

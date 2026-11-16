@@ -1,5 +1,7 @@
 //! Platform-neutral conversion of absolute filesystem paths to LSP file URIs.
 
+use lithe_platform::paths::slash_separated;
+use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -77,13 +79,13 @@ fn document_uri(path: &str, platform: DocumentPathPlatform) -> Result<String, Co
             path.to_owned()
         }
         DocumentPathPlatform::Windows => {
-            let path = path.replace('\\', "/");
+            let path = slash_separated(path, Platform::Windows);
             if let Some(rest) = path.strip_prefix("//?/UNC/") {
                 format!("//{rest}")
             } else if let Some(rest) = path.strip_prefix("//?/") {
                 rest.to_owned()
             } else {
-                path
+                path.into_owned()
             }
         }
         DocumentPathPlatform::Auto => unreachable!("auto platform is resolved above"),

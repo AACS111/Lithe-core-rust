@@ -17,6 +17,8 @@
 //! The sequence contract is `rust/fixtures/workspace/directory-actions-v1.json`; the
 //! request and response shapes are pinned by `directory-rules-v1.json`.
 
+use lithe_platform::paths::invalid_relative_path;
+use lithe_platform::Platform;
 use lithe_protocol::{CoreError, ErrorCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -302,11 +304,7 @@ fn parse<T: serde::de::DeserializeOwned>(payload: Value) -> Result<T, CoreError>
 }
 
 fn validate_path(path: &str) -> Result<(), CoreError> {
-    if path.is_empty()
-        || path.starts_with('/')
-        || path.contains(['\\', ':', '\0'])
-        || path.split('/').any(|part| part == "..")
-    {
+    if invalid_relative_path(path, Platform::HOST) {
         return Err(CoreError::new(
             ErrorCode::InvalidRequest,
             "Directory rule paths must be workspace-relative",
