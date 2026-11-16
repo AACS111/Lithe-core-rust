@@ -540,6 +540,7 @@ or removing a command fails until the table changes in the same commit.
 | `build.decodeDiagnostics` | Decode build output into workspace file diagnostics |
 | `build.decodeDependencies` | Decode dependency output or a provider result into one project's bounded tree |
 | `build.syncFingerprint` | Digest the files a build model depends on, to tell whether it is stale |
+| `build.modelTree` | Nest a decoded model's projects by parent and file each one's tasks, dependencies and targets for a tool window |
 | `build.resolveTestRunOutcome` | Reduce a test run's termination, selected scope and decoded summary to one tool-neutral verdict |
 | `build.mergeTestOutcomes` | Merge a run's test result ids into the stored history inside the host-stated id/prefix scope |
 | `vcs.detectRoots` | Find the VCS roots of a workspace from static markers, with registered providers, ambiguous directories, and applied mappings |
@@ -4748,6 +4749,7 @@ and the directories are absolute host paths used only as substitution text.
 | `build.decodeDiagnostics` | `{ workspaceRoot, root, output }` | `diagnostics`: `[{ path, line, column?, severity, message }]`, deduplicated, inside the workspace only |
 | `build.decodeDependencies` | `{ workspaceRoot, root, project?, output?, outputFile?, result? }` | `dependencies`: `{ project, dependencies: [{ name, group?, version?, scope?, properties?, children }], truncated }` |
 | `build.syncFingerprint` | `{ workspaceRoot, root, projects, options? }` | `sync`: `{ fingerprint, watch }` |
+| `build.modelTree` | `{ model: { projects, targets, tasks }, query?, groupHeadings?: { <group>: heading } }`; `model` is a `build.decodeModel` result, other model fields are ignored | `tree`: `{ project?, nodes, truncated? }`; see below |
 
 Invocation candidates also include `{ kind: "toolchain", toolchainID, root }`.
 Hosts resolve them through the same canonical project/subproject
@@ -4773,6 +4775,55 @@ seconds attribute, rounded to whole milliseconds. Repeated invocations of one ca
 sum their times; when any invocation lacks a valid non-negative time, or the sum
 exceeds 2^53 - 1, the field is omitted. A reported zero is valid. Hosts hide a
 missing duration and never substitute a suite or console summary.
+
+#### Build model tree
+
+`build.modelTree` lays out one instance's tool window, the same way for every
+build tool; hosts render the nodes and neither nest projects nor file tasks
+themselves. It reads no file and starts no process.
+
+- Projects nest by `parentID`. A project whose parent is missing, itself, or
+  part of a loop, or that is nested deeper than 64 levels, becomes a root;
+  roots whose parent is missing or themselves come first, then the rest in
+  model order. A repeated project ID keeps its first project.
+- A `project` node holds, in order: its tasks in folders, a `dependencies`
+  node when `dependencies.scopes` contains `project`, a `targets` node of
+  `target` nodes, and its child projects. A target's children are the
+  declared `target`-scoped tasks whose `targetTags` match it.
+- A declared task (not `fromModel`) with a `project` scope appears in every
+  project; one with a `workspace` scope that has no `project` scope or
+  `requiresUserArguments` appears once in `nodes`, as do tasks with a
+  `workspace` scope when the model has no projects. Model tasks appear in their
+  project. Workspace dependencies (`scopes` with `workspace` but not
+  `project`, or a model with no projects) and test discovery
+  (`test.discovery`) add a `dependencies` or `tests` node to `nodes`.
+- A task is filed under its `category` headings, outermost first, or under
+  one `folder` for its `group`. A group folder carries `group` and the
+  host-sent `groupHeadings` label; a host that sends none labels it itself.
+  Folders keep the order they first appear in; a folder's subfolders come
+  before its tasks.
+- With exactly one root project, `project` is that project's node without
+  children and `nodes` is its contents plus the instance's own; otherwise
+  `nodes` holds the instance's nodes, then the root projects.
+- `query` (at most 256 bytes, no control characters) is trimmed and matched
+  case-insensitively against `label`, `detail` and `tooltip`. A matching node
+  is kept whole with the nodes on the way to it, an unmatched `dependencies`
+  node is dropped, and a `tests` node is always kept because its entries load
+  later. A blank query, or one the single root project matches, keeps
+  everything.
+- A node is `{ kind, key, label?, detail?, tooltip?, group?, projectID?,
+  targetID?, taskID?, children? }`, `kind` one of `project`, `folder`, `task`,
+  `targets`, `target`, `dependencies`, `tests`. `key` is opaque, unique in the
+  instance and stable across reloads and filters, so hosts remember open nodes
+  by it. `projectID` and `targetID` are what a task runs on (absent: the whole
+  instance); `taskID` is a declared task's ID or a model task's ID.
+  `targets`, `dependencies` and `tests` nodes have no label.
+- The model may hold at most 2,000 projects and 10,000 targets and 10,000
+  tasks; more is `invalid_request`, as are unknown request fields and group
+  headings that are blank, longer than 120 bytes or contain control
+  characters. A tree is cut at 50,000 nodes and then carries
+  `truncated: true`. `rust/fixtures/build/model-tree-v1.json` holds the golden
+  trees.
 
 ### VCS providers
 

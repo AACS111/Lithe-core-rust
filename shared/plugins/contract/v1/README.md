@@ -1744,6 +1744,27 @@ changes a plan.
   than four headings or has an empty heading falls back to the template's, so
   a tool that reports a bad heading still has its task filed.
 
+Core lays out the window's tree from the model, the same way for every build
+tool (`build.modelTree` in the
+[Rust Core API](../../../../rust/contracts/rust-core-api.md#build-systems)):
+
+- Projects nest by `parentID`. A project with no parent in the model, or one
+  whose parent chain loops back to itself, becomes a root.
+- Each project lists, in this order, its tasks in their folders, a
+  dependencies node when `dependencies.scopes` contains `project`, a targets
+  node whose targets carry their target-scoped tasks (filtered by
+  `targetTags`), and its child projects.
+- A declared task with a `project` scope appears in every project. A task with
+  only a `workspace` scope, or one that `requiresUserArguments`, appears once,
+  beside the root projects; so do workspace dependencies and discovered
+  tests. When the model has no projects, every `workspace` task appears there.
+- When the model has a single root project, that project's contents become
+  the build system's own, and its tasks still run on the root project. Guard
+  project-only arguments with `nestedProjectSelected` so running them on the
+  root builds everything.
+- A filter keeps each matching node whole, together with the projects and
+  folders on the way to it.
+
 A host that draws build-system windows gives each detected build system its own tool window and uses
 these presentation fields. The host-drawn windows share Build Output, docking,
 layout restoration, activation, and lifecycle with other workbench contributions.
