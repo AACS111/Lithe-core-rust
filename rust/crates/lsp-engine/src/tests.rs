@@ -1707,6 +1707,51 @@ fn native_owner_retains_indexing_cancellation_after_registration() {
 }
 
 #[test]
+fn startup_launches_before_git_exclusions_resolve_and_publishes_them_afterwards() {
+    let workspace = TemporaryWorkspace::recursive("indexing-deferred-git-exclusions");
+    let root = workspace.root.canonicalize().unwrap();
+    let root_uri = url::Url::from_directory_path(&root).unwrap().to_string();
+    let status = lithe_project::indexing::configure(
+        serde_json::from_value(json!({
+            "root": root, "manualExcludedDirectories": [], "includedDirectories": [],
+            "gitIgnoreEnabled": true
+        }))
+        .unwrap(),
+        crate::indexing_changed,
+    )
+    .unwrap();
+    let (_, pending) = lithe_project::indexing::provider_context_without_scan(&root).unwrap();
+    assert!(pending, "the fixture starts with unresolved Git decisions");
+    let harness = Harness::start(|request| {
+        workspace.configure(request);
+        request.root_uri = root_uri.clone();
+    });
+    assert!(
+        notifications(&harness, "initialize").pop().is_some(),
+        "the server is launched and initialized without waiting for the scan"
+    );
+    // The background publisher resolves the same generation after the launch.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let (_, pending) = lithe_project::indexing::provider_context_without_scan(&root).unwrap();
+        if !pending {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "deferred Git exclusions were not resolved within 5 seconds"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    drop(harness);
+    let _ = lithe_project::indexing::release(lithe_project::indexing::ReleaseIndexingRequest {
+        root: root.to_string_lossy().into_owned(),
+        owner_id: None,
+        revision: status.revision,
+    });
+}
+
+#[test]
 fn indexing_released_root_allows_a_standalone_provider_without_old_exclusions() {
     let workspace = TemporaryWorkspace::recursive("indexing-released-standalone");
     let root = workspace.root.canonicalize().unwrap();
@@ -1743,7 +1788,7 @@ fn indexing_released_root_allows_a_standalone_provider_without_old_exclusions() 
 }
 
 #[test]
-fn indexing_cold_start_resolves_git_before_provider_initialization() {
+fn indexing_cold_start_publishes_git_exclusions_after_provider_launch() {
     let workspace = TemporaryWorkspace::recursive("indexing-cold-start");
     let root = workspace.root.canonicalize().unwrap();
     std::fs::create_dir_all(root.join("ignored")).unwrap();
@@ -1789,15 +1834,25 @@ fn indexing_cold_start_resolves_git_before_provider_initialization() {
     ] {
         let harness = start(Some(declaration));
         assert!(notifications(&harness, "initialize").pop().is_some());
-        let value = harness.session().plugin_configuration().unwrap();
-        assert_eq!(value["server"]["mode"], "full");
-        assert!(value
-            .pointer(pointer)
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|item| item == entry));
+        // A cold start launches first; the Git decisions follow from the
+        // background publisher, bounded so a lost update fails the test.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let value = harness.session().plugin_configuration().unwrap();
+            assert_eq!(value["server"]["mode"], "full");
+            let published = value
+                .pointer(pointer)
+                .and_then(Value::as_array)
+                .is_some_and(|items| items.iter().any(|item| item == entry));
+            if published {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "Git exclusions were not published to {pointer} within 5 seconds"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
     }
     let undeclared = start(None);
     assert_eq!(

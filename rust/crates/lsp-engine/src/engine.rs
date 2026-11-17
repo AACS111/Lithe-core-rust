@@ -114,13 +114,18 @@ impl LspEngine {
                 "The plugin's language server does not support remote workspaces",
             ));
         }
-        // Initial provider settings must include native Git decisions even when
-        // no session or inventory warm-up has run. Never scan under registry locks.
+        // Resolving native Git decisions walks the whole workspace, which can take
+        // minutes on a large multi-repository tree and used to outlast the host's
+        // start deadline before the process was even launched. The start only
+        // reads the live context; unresolved decisions are resolved after the
+        // launch by `publish_pending_exclusions`, which pushes them to the
+        // session through the same path as any later indexing change. Never scan
+        // under registry locks.
         let indexing_root = canonical_workspace_path(&request.root_uri);
-        let indexing_context = if let Some(root) = &indexing_root {
-            lithe_project::indexing::prepare_provider_exclusions(root)?
+        let (indexing_context, exclusions_pending) = if let Some(root) = &indexing_root {
+            lithe_project::indexing::provider_context_without_scan(root)?
         } else {
-            None
+            (None, false)
         };
         let check_indexing = || {
             if let Some(context) = &indexing_context {
@@ -324,6 +329,12 @@ impl LspEngine {
             return Err(error);
         }
 
+        if exclusions_pending {
+            if let Some(root) = indexing_root.clone() {
+                publish_pending_exclusions(root, Arc::clone(&self.sessions), &session);
+            }
+        }
+
         Ok(StartServerResponse {
             channel: session.log_identity.channel(),
             session_id,
@@ -411,4 +422,44 @@ fn startup_attempt(request: &StartServerRequest) -> AttemptSlot {
         }
         _ => Attempt::none(),
     }
+}
+
+/// Resolves the workspace's native Git decisions off the start path and pushes
+/// them to every running session of that workspace.
+///
+/// `start_server_attempt` launches the process without waiting for the full
+/// workspace walk. Until this finishes, a server that pulls
+/// `workspace/configuration` sees only the exclusions known at start; the
+/// update below then re-sends the configuration exactly like a later indexing
+/// change, so the server narrows its import scope instead of missing it. The
+/// thread holds only a weak reference to the started session, which is used to
+/// record a failure in that session's log channel.
+fn publish_pending_exclusions(
+    root: PathBuf,
+    sessions: Arc<Mutex<BTreeMap<String, Arc<RuntimeSession>>>>,
+    started: &Arc<RuntimeSession>,
+) {
+    let started = Arc::downgrade(started);
+    thread::spawn(move || {
+        let result = sessions
+            .lock()
+            .map_err(|_| CoreError::new(ErrorCode::Unknown, "LSP registry lock was poisoned"))
+            .map(|registry| registry.values().cloned().collect::<Vec<_>>())
+            .and_then(|running| apply_indexing_to_sessions(&root, running));
+        let Err(error) = result else {
+            return;
+        };
+        // log-exempt: User cancellation: a closed workspace or a replaced indexing policy retires the context, and the replacement publishes its own decisions.
+        if matches!(error.code, ErrorCode::Cancelled) {
+            return;
+        }
+        if let Some(session) = started.upgrade() {
+            session.log(
+                "warn",
+                EngineLog::ExclusionsFailed,
+                "Indexing exclusions could not be published to the language server",
+                Some(core_error_detail(&error)),
+            );
+        }
+    });
 }
