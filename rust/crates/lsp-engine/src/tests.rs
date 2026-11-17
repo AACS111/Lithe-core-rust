@@ -1722,6 +1722,10 @@ fn startup_launches_before_git_exclusions_resolve_and_publishes_them_afterwards(
     .unwrap();
     let (_, pending) = lithe_project::indexing::provider_context_without_scan(&root).unwrap();
     assert!(pending, "the fixture starts with unresolved Git decisions");
+    // Order under test: the start returns and the server initializes while the
+    // walk is held, then the walk runs. A start that walks the workspace itself
+    // resolves the decisions before returning and fails the second assertion.
+    let walk = crate::engine::deferred_exclusions::hold(&root_uri);
     let harness = Harness::start(|request| {
         workspace.configure(request);
         request.root_uri = root_uri.clone();
@@ -1730,19 +1734,18 @@ fn startup_launches_before_git_exclusions_resolve_and_publishes_them_afterwards(
         notifications(&harness, "initialize").pop().is_some(),
         "the server is launched and initialized without waiting for the scan"
     );
-    // The background publisher resolves the same generation after the launch.
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        let (_, pending) = lithe_project::indexing::provider_context_without_scan(&root).unwrap();
-        if !pending {
-            break;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "deferred Git exclusions were not resolved within 5 seconds"
-        );
-        thread::sleep(Duration::from_millis(10));
-    }
+    let (_, pending) = lithe_project::indexing::provider_context_without_scan(&root).unwrap();
+    assert!(pending, "the start resolved the Git decisions itself");
+    assert!(
+        walk.release_and_wait(),
+        "the deferred Git walk did not finish within 5 seconds"
+    );
+    let (_, pending) = lithe_project::indexing::provider_context_without_scan(&root).unwrap();
+    assert!(
+        !pending,
+        "the background publisher resolves the generation the server started with"
+    );
+    drop(walk);
     drop(harness);
     let _ = lithe_project::indexing::release(lithe_project::indexing::ReleaseIndexingRequest {
         root: root.to_string_lossy().into_owned(),
